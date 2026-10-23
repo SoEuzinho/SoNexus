@@ -1,0 +1,93 @@
+<UserControl x:Class="SoNexus.Views.GameLibraryView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Loaded="OnLoaded">
+    <DockPanel>
+        <Grid DockPanel.Dock="Top" Margin="0,0,14,14">
+            <StackPanel Margin="0,0,380,0">
+                <TextBlock Text="Biblioteca de jogos" Style="{StaticResource H1}"/>
+                <TextBlock x:Name="Status" Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,0" TextWrapping="Wrap"
+                           Text="Procurando jogos em todos os launchers..."/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <Grid Width="200" Margin="0,0,8,0">
+                    <TextBox x:Name="FilterBox" TextChanged="Filter_Changed"/>
+                    <TextBlock x:Name="FilterHint" Text="Buscar jogo" IsHitTestVisible="False" Style="{StaticResource Muted}" Margin="11,0,0,0" VerticalAlignment="Center"/>
+                </Grid>
+                <ComboBox x:Name="SortBox" Width="150" SelectedIndex="0" SelectionChanged="Filter_Changed">
+                    <ComboBoxItem Content="Ordem: nome"/>
+                    <ComboBoxItem Content="Mais pesados primeiro"/>
+                    <ComboBoxItem Content="Maiores primeiro"/>
+                </ComboBox>
+            </StackPanel>
+        </Grid>
+
+        <!-- Launchers -->
+        <ItemsControl x:Name="LauncherList" DockPanel.Dock="Top" Margin="0,0,14,12">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="6" Padding="12,6" Margin="0,0,8,8">
+                        <TextBlock>
+                            <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold"/>
+                            <Run Text="{Binding Status, Mode=OneWay}" Foreground="{StaticResource MutedBrush}"/> ·
+                            <Run Text="{Binding Games, Mode=OneWay}" Foreground="{StaticResource MutedBrush}"/><Run Text=" jogos" Foreground="{StaticResource MutedBrush}"/>
+                        </TextBlock>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <TextBlock DockPanel.Dock="Bottom" Style="{StaticResource Muted}" Margin="0,8,14,0" TextWrapping="Wrap"
+                   Text="FPS estimado na resolução do seu monitor, a partir dos requisitos oficiais (loja Steam) comparados com a sua placa de vídeo e processador. É uma estimativa: o FPS real depende da cena, das configurações e de DLSS/FSR. Meça de verdade em Jogos > FPS ao vivo."/>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <ItemsControl x:Name="GameList" Margin="0,0,14,0">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <UniformGrid Columns="3" VerticalAlignment="Top"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Style="{StaticResource Card}" Margin="0,0,12,12" Padding="0" ClipToBounds="True">
+                            <StackPanel>
+                                <Grid Height="110" Background="#111111">
+                                    <Image Source="{Binding Image, TargetNullValue={x:Null}}" Stretch="UniformToFill" Opacity="0.85"/>
+                                    <Border Background="#CC000000" CornerRadius="4" Padding="8,3" Margin="10" HorizontalAlignment="Right" VerticalAlignment="Top">
+                                        <TextBlock Text="{Binding Estimate}" FontWeight="SemiBold" FontFamily="Consolas"/>
+                                    </Border>
+                                </Grid>
+                                <StackPanel Margin="14,10,14,12">
+                                    <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="{Binding Info}" Style="{StaticResource Muted}"/>
+                                    <Grid Margin="0,8,0,0">
+                                        <TextBlock x:Name="verdict" Text="{Binding Verdict}" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding Quality}" HorizontalAlignment="Right" Style="{StaticResource Muted}"/>
+                                    </Grid>
+                                    <TextBlock Text="{Binding Detail}" Style="{StaticResource Muted}" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,8" Height="30"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button Content="Jogar" Padding="12,4" Margin="0,0,6,0" Tag="{Binding}" Click="Play_Click"/>
+                                        <Button Content="Pasta" Padding="12,4" Tag="{Binding}" Click="Folder_Click"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                        <DataTemplate.Triggers>
+                            <DataTrigger Binding="{Binding Verdict}" Value="Muito pesado">
+                                <Setter TargetName="verdict" Property="Foreground" Value="{StaticResource DangerBrush}"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Verdict}" Value="Pesado">
+                                <Setter TargetName="verdict" Property="Foreground" Value="{StaticResource DangerBrush}"/>
+                            </DataTrigger>
+                        </DataTemplate.Triggers>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

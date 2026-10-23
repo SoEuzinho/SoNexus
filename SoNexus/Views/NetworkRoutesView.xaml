@@ -1,0 +1,88 @@
+<UserControl x:Class="SoNexus.Views.NetworkRoutesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Loaded="OnLoaded">
+    <DockPanel>
+        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,16">
+            <TextBlock Text="Rotas e servidores de jogos" Style="{StaticResource H1}"/>
+            <TextBlock Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,0" TextWrapping="Wrap"
+                       Text="Mostra cada ponto por onde a sua conexão passa até o servidor (roteador, provedor, internet), com ping e perda em cada um, como o WinMTR. Com um jogo aberto, o SoNexus encontra o servidor em que ele está conectado."/>
+        </StackPanel>
+
+        <Border DockPanel.Dock="Top" Style="{StaticResource Card}" Margin="0,0,14,14">
+            <StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <ComboBox x:Name="TargetBox" IsEditable="True" Margin="0,0,10,0" SelectionChanged="Target_Selected"/>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <Button Content="Procurar jogo aberto" Margin="0,0,8,0" Click="FindGame_Click"/>
+                        <Button x:Name="TraceButton" Content="Traçar rota" Style="{StaticResource PrimaryButton}" Click="Trace_Click"/>
+                        <Button x:Name="StopButton" Content="Parar" Visibility="Collapsed" Click="Stop_Click"/>
+                    </StackPanel>
+                </Grid>
+                <TextBlock x:Name="TargetHint" Style="{StaticResource Muted}" Margin="0,8,0,0" TextWrapping="Wrap"
+                           Text="Escolha um destino da lista, digite um site/IP ou clique em &quot;Procurar jogo aberto&quot; com o jogo rodando."/>
+            </StackPanel>
+        </Border>
+
+        <Border DockPanel.Dock="Top" x:Name="VerdictCard" Style="{StaticResource Card}" Margin="0,0,14,14" Visibility="Collapsed">
+            <StackPanel>
+                <TextBlock Text="DIAGNÓSTICO" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
+                <TextBlock x:Name="VerdictTitle" FontSize="18" FontWeight="SemiBold" Margin="0,4,0,2"/>
+                <TextBlock x:Name="VerdictText" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource Card}" Margin="0,0,14,0">
+            <DockPanel>
+                <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="40"/>
+                        <ColumnDefinition Width="130"/>
+                        <ColumnDefinition/>
+                        <ColumnDefinition Width="80"/>
+                        <ColumnDefinition Width="90"/>
+                        <ColumnDefinition Width="60"/>
+                        <ColumnDefinition Width="60"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="#" Style="{StaticResource Muted}"/>
+                    <TextBlock Grid.Column="1" Text="ONDE" Style="{StaticResource Muted}"/>
+                    <TextBlock Grid.Column="2" Text="ENDEREÇO" Style="{StaticResource Muted}"/>
+                    <TextBlock Grid.Column="3" Text="PING" Style="{StaticResource Muted}" TextAlignment="Right"/>
+                    <TextBlock Grid.Column="4" Text="MÍN–MÁX" Style="{StaticResource Muted}" TextAlignment="Right"/>
+                    <TextBlock Grid.Column="5" Text="PERDA" Style="{StaticResource Muted}" TextAlignment="Right"/>
+                    <TextBlock Grid.Column="6" Text="ENVIOS" Style="{StaticResource Muted}" TextAlignment="Right"/>
+                </Grid>
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ItemsControl x:Name="HopList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="40"/>
+                                        <ColumnDefinition Width="130"/>
+                                        <ColumnDefinition/>
+                                        <ColumnDefinition Width="80"/>
+                                        <ColumnDefinition Width="90"/>
+                                        <ColumnDefinition Width="60"/>
+                                        <ColumnDefinition Width="60"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding Hop}" Style="{StaticResource Muted}"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding Role}"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding Name}" TextTrimming="CharacterEllipsis" Margin="0,0,10,0"/>
+                                    <TextBlock Grid.Column="3" Text="{Binding AvgText}" FontWeight="SemiBold" TextAlignment="Right"/>
+                                    <TextBlock Grid.Column="4" Text="{Binding RangeText}" Style="{StaticResource Muted}" TextAlignment="Right"/>
+                                    <TextBlock Grid.Column="5" Text="{Binding LossText}" TextAlignment="Right"/>
+                                    <TextBlock Grid.Column="6" Text="{Binding SentText}" Style="{StaticResource Muted}" TextAlignment="Right"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+    </DockPanel>
+</UserControl>

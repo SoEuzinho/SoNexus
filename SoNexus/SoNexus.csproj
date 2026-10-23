@@ -1,0 +1,64 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyName>SoNexus</AssemblyName>
+    <RootNamespace>SoNexus</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Version>0.18.0</Version>
+    <!-- Roda em qualquer PC Windows 10/11 de 64 bits, sem precisar instalar o .NET.
+         Pasta comum (sem "arquivo único" compactado) para não parecer suspeito aos antivírus. -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <!-- Otimizações: compilação guiada por perfil (código mais rápido depois de alguns segundos)
+         e só os idiomas usados (pasta do programa menor). -->
+    <TieredPGO>true</TieredPGO>
+    <!-- App de desktop: coleta de lixo sem a thread de fundo extra (menos memória e CPU parado). -->
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <!-- Não grava o caminho da pasta de quem compilou (com o nome de usuário) dentro do .exe/.pdb. -->
+    <PathMap>$(MSBuildProjectDirectory)=SoNexus</PathMap>
+    <Deterministic>true</Deterministic>
+    <SatelliteResourceLanguages>pt-BR;pt</SatelliteResourceLanguages>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <ApplicationIcon>Assets\SoNexus.ico</ApplicationIcon>
+    <Product>SoNexus</Product>
+    <Company>SoStudio</Company>
+    <Authors>SoEuzinho</Authors>
+    <Copyright>© SoStudio · criado por SoEuzinho</Copyright>
+    <Description>Kit de ferramentas para PC Windows: sensores, otimização, drivers, jogos, rede, áudio e diagnóstico.</Description>
+    <!-- Só para o ícone na bandeja do Windows (NotifyIcon); o resto da interface é WPF. -->
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Sem estes usings globais do Windows Forms, "Application", "MessageBox" etc. continuam sendo os do WPF. -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Termos: arquivo ao lado do .exe (instalador) e embutido (a tela de aceite nunca fica sem o texto). -->
+    <None Include="TERMOS-E-PRIVACIDADE.txt" CopyToOutputDirectory="PreserveNewest" />
+    <EmbeddedResource Include="TERMOS-E-PRIVACIDADE.txt" LogicalName="SoNexus.Termos.txt" />
+    <!-- Instalador oficial e assinado do driver PawnIO (namazso), usado pelos sensores da CPU/placa-mãe. -->
+    <EmbeddedResource Include="Assets\PawnIO_setup.exe" LogicalName="SoNexus.PawnIO_setup.exe" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 0.9.6 usa o driver PawnIO (assinado). A 0.9.4 usava o WinRing0, bloqueado pelo Windows Defender. -->
+    <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
+    <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="4.0.0" />
+    <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
+    <PackageReference Include="System.Diagnostics.EventLog" Version="10.0.2" />
+    <PackageReference Include="System.Management" Version="10.0.2" />
+    <PackageReference Include="Vortice.D3DCompiler" Version="3.6.2" />
+    <PackageReference Include="Vortice.Direct3D11" Version="3.6.2" />
+  </ItemGroup>
+
+</Project>

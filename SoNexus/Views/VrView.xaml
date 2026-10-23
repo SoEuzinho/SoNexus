@@ -1,0 +1,132 @@
+<UserControl x:Class="SoNexus.Views.VrView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Loaded="OnLoaded">
+    <UserControl.Resources>
+        <Style x:Key="Label" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="0,0,14,0">
+            <TextBlock Text="Realidade virtual" Style="{StaticResource H1}"/>
+            <TextBlock Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,20" TextWrapping="Wrap"
+                       Text="Programas de VR instalados, qual deles responde pelos jogos (OpenXR), se a rede e a placa estão prontas para streaming e um modo que prepara o PC para jogar."/>
+
+            <UniformGrid Columns="2">
+                <Border Style="{StaticResource Card}" Margin="0,0,12,12">
+                    <StackPanel>
+                        <TextBlock Text="AGORA" Style="{StaticResource Label}"/>
+                        <TextBlock x:Name="LiveTitle" Text="Verificando..." FontSize="18" FontWeight="SemiBold" Margin="0,4,0,2" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="LiveDetail" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource Card}" Margin="0,0,12,12">
+                    <StackPanel>
+                        <TextBlock Text="ESTABILIDADE DO WI-FI PARA VR" Style="{StaticResource Label}"/>
+                        <TextBlock Style="{StaticResource Muted}" Margin="0,2,0,10" TextWrapping="Wrap"
+                                   Text="Mede por 20 s o atraso até os óculos (se estiverem conectados) ou até o roteador. Em VR sem fio, os picos importam mais que a média."/>
+                        <StackPanel Orientation="Horizontal">
+                            <Button x:Name="StabilityButton" Content="Testar estabilidade" Margin="0,0,10,0" Click="Stability_Click"/>
+                            <ProgressBar x:Name="StabilityBar" Style="{StaticResource Meter}" Width="160" Maximum="100" VerticalAlignment="Center" Visibility="Collapsed"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StabilityText" Style="{StaticResource Muted}" Margin="0,10,0,0" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+
+            <ItemsControl x:Name="AppList">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <UniformGrid Columns="3"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Style="{StaticResource Card}" Margin="0,0,12,12">
+                            <StackPanel>
+                                <Grid>
+                                    <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding Status}" HorizontalAlignment="Right" Style="{StaticResource Muted}"/>
+                                </Grid>
+                                <TextBlock Text="{Binding Detail}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,10" Height="48"/>
+                                <Button Content="Abrir" HorizontalAlignment="Left" Padding="14,5" Tag="{Binding}" Click="Launch_Click"/>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock x:Name="NoApps" Style="{StaticResource Muted}" Visibility="Collapsed" Margin="0,0,0,12"
+                       Text="Nenhum programa de VR encontrado (Virtual Desktop, SteamVR, Meta Quest Link, ALVR, Pico)."/>
+
+            <UniformGrid Columns="2">
+                <Border Style="{StaticResource Card}" Margin="0,0,12,12" VerticalAlignment="Top">
+                    <StackPanel>
+                        <TextBlock Text="RUNTIME OPENXR (QUEM RODA OS JOGOS VR)" Style="{StaticResource Label}"/>
+                        <TextBlock Style="{StaticResource Muted}" Margin="0,2,0,10" TextWrapping="Wrap"
+                                   Text="Jogos OpenXR usam o runtime ativo. Com Virtual Desktop, o VDXR pula o SteamVR e reduz latência e uso da GPU. Se um jogo não abrir, volte para o SteamVR."/>
+                        <ComboBox x:Name="RuntimeBox" DisplayMemberPath="Display" Margin="0,0,0,10"/>
+                        <Button Content="Usar este runtime" HorizontalAlignment="Left" Click="SetRuntime_Click"/>
+                        <TextBlock x:Name="RuntimeStatus" Style="{StaticResource Muted}" Margin="0,8,0,0" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource Card}" Margin="0,0,12,12" VerticalAlignment="Top">
+                    <StackPanel>
+                        <TextBlock Text="PRONTO PARA STREAMING SEM FIO?" Style="{StaticResource Label}" Margin="0,0,0,8"/>
+                        <ItemsControl x:Name="CheckList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="0,0,0,10">
+                                        <TextBlock FontWeight="SemiBold">
+                                            <Run Text="{Binding Key, Mode=OneWay}"/>
+                                        </TextBlock>
+                                        <TextBlock Text="{Binding Value}" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+
+            <Border Style="{StaticResource Card}" Margin="0,0,12,12">
+                <StackPanel>
+                    <TextBlock Text="MODO VR" Style="{StaticResource Label}"/>
+                    <TextBlock Style="{StaticResource Muted}" Margin="0,2,0,12" TextWrapping="Wrap"
+                               Text="Antes de colocar os óculos: liga o plano de energia de alto desempenho, dá prioridade alta ao Virtual Desktop/SteamVR e libera RAM. Desfazer volta o plano de energia anterior."/>
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="VrOnButton" Content="Ativar Modo VR" Style="{StaticResource PrimaryButton}" Margin="0,0,8,0" Click="VrOn_Click"/>
+                        <Button Content="Desfazer" Click="VrOff_Click"/>
+                    </StackPanel>
+                    <TextBlock x:Name="VrLog" Style="{StaticResource Muted}" Margin="0,10,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Margin="0,0,12,12">
+                <StackPanel>
+                    <TextBlock Text="JOGOS VR INSTALADOS" Style="{StaticResource Label}" Margin="0,0,0,8"/>
+                    <ItemsControl x:Name="VrGameList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,4">
+                                    <StackPanel Margin="0,0,260,0">
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding Detail}" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                                        <TextBlock Text="{Binding Estimate}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                        <Button Content="Jogar" Padding="12,3" Tag="{Binding}" Click="PlayGame_Click"/>
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock x:Name="VrGamesStatus" Style="{StaticResource Muted}" Text="Procurando jogos com suporte a VR..."/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

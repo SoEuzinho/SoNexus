@@ -1,0 +1,54 @@
+<UserControl x:Class="SoNexus.Views.VoicemeeterView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Loaded="OnLoaded" Unloaded="OnUnloaded">
+    <UserControl.Resources>
+        <DataTemplate x:Key="Channel">
+            <Border Style="{StaticResource Card}" Margin="0,0,10,10" Padding="14,12" Width="170">
+                <StackPanel>
+                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Text="{Binding Device}" Style="{StaticResource Muted}" FontSize="11" TextTrimming="CharacterEllipsis" Height="16"/>
+                    <ProgressBar Style="{StaticResource Meter}" Height="6" Foreground="White" Value="{Binding Level, Mode=OneWay}" Margin="0,10,0,8"/>
+                    <Grid>
+                        <TextBlock Text="{Binding GainText}" FontFamily="Consolas"/>
+                        <Button Content="{Binding MuteText}" HorizontalAlignment="Right" Padding="10,2" FontSize="11" Tag="{Binding}" Click="Mute_Click"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <DockPanel>
+        <Grid DockPanel.Dock="Top" Margin="0,0,14,16">
+            <StackPanel Margin="0,0,160,0">
+                <TextBlock Text="Voicemeeter" Style="{StaticResource H1}"/>
+                <TextBlock x:Name="Status" Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,0" TextWrapping="Wrap"/>
+            </StackPanel>
+            <Button x:Name="ConnectButton" Content="Conectar" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Right"
+                    VerticalAlignment="Center" Click="Connect_Click"/>
+        </Grid>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="Mixer" Visibility="Collapsed">
+                <TextBlock Text="ENTRADAS" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,8"/>
+                <ItemsControl x:Name="StripList" ItemTemplate="{StaticResource Channel}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+                <TextBlock Text="SAÍDAS (BUS)" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,12,0,8"/>
+                <ItemsControl x:Name="BusList" ItemTemplate="{StaticResource Channel}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+                <TextBlock Style="{StaticResource Muted}" Margin="0,8,0,0" TextWrapping="Wrap"
+                           Text="Os medidores mostram o nível depois do volume (de -60 dB a 0 dB). O botão ativa ou deixa mudo o canal direto no Voicemeeter."/>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

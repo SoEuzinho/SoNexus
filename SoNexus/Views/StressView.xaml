@@ -1,0 +1,109 @@
+<UserControl x:Class="SoNexus.Views.StressView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:SoNexus.Controls">
+    <DockPanel>
+        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,16">
+            <TextBlock Text="Stress test" Style="{StaticResource H1}"/>
+            <TextBlock Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,0" TextWrapping="Wrap"
+                       Text="Coloca a peça em 100% e confere cada resultado, como o OCCT: processador (AVX), memória RAM, placa de vídeo, memória de vídeo, ou tudo junto (testa também a fonte). Mostra se esquenta demais ou fica instável (erros de cálculo)."/>
+        </StackPanel>
+
+        <!-- Configuração -->
+        <Border DockPanel.Dock="Top" Style="{StaticResource Card}" Margin="0,0,0,14" Padding="16,12">
+            <Grid>
+                <StackPanel x:Name="SetupPanel" Orientation="Horizontal">
+                    <TextBlock Text="Modo" Style="{StaticResource Muted}" FontSize="13" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <ComboBox x:Name="ModeBox" Width="250" SelectedIndex="0" Margin="0,0,18,0">
+                        <ComboBoxItem Content="Processador (máximo calor)"/>
+                        <ComboBoxItem Content="Processador + cache/controlador"/>
+                        <ComboBoxItem Content="Memória RAM (procura erros)"/>
+                        <ComboBoxItem Content="Placa de vídeo (GPU)"/>
+                        <ComboBoxItem Content="Memória de vídeo (VRAM)"/>
+                        <ComboBoxItem Content="Tudo junto (CPU + GPU, testa a fonte)"/>
+                    </ComboBox>
+                    <TextBlock Text="Duração" Style="{StaticResource Muted}" FontSize="13" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <ComboBox x:Name="DurationBox" Width="120" SelectedIndex="1" Margin="0,0,18,0">
+                        <ComboBoxItem Content="5 minutos" Tag="5"/>
+                        <ComboBoxItem Content="10 minutos" Tag="10"/>
+                        <ComboBoxItem Content="30 minutos" Tag="30"/>
+                        <ComboBoxItem Content="1 hora" Tag="60"/>
+                        <ComboBoxItem Content="Sem limite" Tag="0"/>
+                    </ComboBox>
+                    <TextBlock Text="Parar se passar de" Style="{StaticResource Muted}" FontSize="13" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <ComboBox x:Name="LimitBox" Width="90" SelectedIndex="2">
+                        <ComboBoxItem Content="85 °C" Tag="85"/>
+                        <ComboBoxItem Content="90 °C" Tag="90"/>
+                        <ComboBoxItem Content="95 °C" Tag="95"/>
+                        <ComboBoxItem Content="100 °C" Tag="100"/>
+                    </ComboBox>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button x:Name="StartButton" Content="Iniciar" Style="{StaticResource PrimaryButton}" Click="Start_Click"/>
+                    <Button x:Name="StopButton" Content="Parar" Visibility="Collapsed" Click="Stop_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Resultado -->
+        <Border x:Name="ResultBanner" DockPanel.Dock="Top" Visibility="Collapsed" Margin="0,0,0,14"
+                BorderThickness="1" CornerRadius="10" Padding="14,10">
+            <TextBlock x:Name="ResultText" TextWrapping="Wrap" FontWeight="SemiBold"/>
+        </Border>
+
+        <!-- Números -->
+        <UniformGrid DockPanel.Dock="Top" Columns="5" Margin="0,0,0,0">
+            <Border Style="{StaticResource Card}" Margin="0,0,14,14">
+                <StackPanel>
+                    <TextBlock Text="TEMPO" Foreground="{StaticResource AccentBrush}" FontSize="11" FontWeight="Bold"/>
+                    <TextBlock x:Name="TimeText" Text="00:00:00" FontSize="26" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="TimeDetail" Style="{StaticResource Muted}"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource Card}" Margin="0,0,14,14">
+                <StackPanel>
+                    <TextBlock x:Name="TempLabel" Text="TEMPERATURA CPU" Foreground="{StaticResource AccentBrush}" FontSize="11" FontWeight="Bold"/>
+                    <TextBlock x:Name="TempText" Text="—" FontSize="26" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="TempDetail" Style="{StaticResource Muted}"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource Card}" Margin="0,0,14,14">
+                <StackPanel>
+                    <TextBlock x:Name="PowerLabel" Text="CONSUMO CPU" Foreground="{StaticResource AccentBrush}" FontSize="11" FontWeight="Bold"/>
+                    <TextBlock x:Name="PowerText" Text="—" FontSize="26" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="PowerDetail" Style="{StaticResource Muted}"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource Card}" Margin="0,0,14,14">
+                <StackPanel>
+                    <TextBlock x:Name="ClockLabel" Text="CLOCK" Foreground="{StaticResource AccentBrush}" FontSize="11" FontWeight="Bold"/>
+                    <TextBlock x:Name="ClockText" Text="—" FontSize="26" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="ClockDetail" Style="{StaticResource Muted}"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource Card}" Margin="0,0,14,14">
+                <StackPanel>
+                    <TextBlock Text="ERROS DE CÁLCULO" Foreground="{StaticResource AccentBrush}" FontSize="11" FontWeight="Bold"/>
+                    <TextBlock x:Name="ErrorsText" Text="—" FontSize="26" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="ErrorsDetail" Style="{StaticResource Muted}"/>
+                </StackPanel>
+            </Border>
+        </UniformGrid>
+
+        <!-- Gráficos -->
+        <UniformGrid Columns="2">
+            <Border Style="{StaticResource Card}" Margin="0,0,14,0">
+                <DockPanel>
+                    <TextBlock x:Name="TempChartTitle" DockPanel.Dock="Top" Text="Temperatura" Style="{StaticResource H2}" Margin="0,0,0,8"/>
+                    <c:LineChart x:Name="TempChart" Unit="°C" FixedMin="20" FixedMax="110"/>
+                </DockPanel>
+            </Border>
+            <Border Style="{StaticResource Card}" Margin="0,0,14,0">
+                <DockPanel>
+                    <TextBlock x:Name="PowerChartTitle" DockPanel.Dock="Top" Text="Consumo" Style="{StaticResource H2}" Margin="0,0,0,8"/>
+                    <c:LineChart x:Name="PowerChart" Unit="W"/>
+                </DockPanel>
+            </Border>
+        </UniformGrid>
+    </DockPanel>
+</UserControl>

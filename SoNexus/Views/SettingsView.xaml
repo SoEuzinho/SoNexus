@@ -1,0 +1,199 @@
+<UserControl x:Class="SoNexus.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Loaded="OnLoaded">
+    <UserControl.Resources>
+        <Style x:Key="Label" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
+        </Style>
+        <Style x:Key="Hint" TargetType="TextBlock" BasedOn="{StaticResource Muted}">
+            <Setter Property="Margin" Value="26,2,0,14"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style x:Key="Row" TargetType="Grid">
+            <Setter Property="Margin" Value="0,0,0,12"/>
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="0,0,14,0" MaxWidth="900" HorizontalAlignment="Left">
+            <TextBlock Text="Configurações" Style="{StaticResource H1}"/>
+            <TextBlock Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,20" Text="Como o SoNexus roda no seu PC. Tudo é salvo na hora."/>
+
+            <!-- Segundo plano -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="SEGUNDO PLANO" Style="{StaticResource Label}"/>
+                    <CheckBox x:Name="CloseBox" Content="Ao fechar (X), continuar rodando perto do relógio" Click="Option_Click"/>
+                    <TextBlock Style="{StaticResource Hint}"
+                               Text="Ventoinhas, iluminação, avisos e sensores seguem funcionando. Para sair de vez: botão de desligar no canto inferior esquerdo, ou clique direito no ícone › Fechar completamente."/>
+                    <CheckBox x:Name="MinimizeBox" Content="Ao minimizar (—), esconder também da barra de tarefas" Click="Option_Click"/>
+                    <TextBlock Style="{StaticResource Hint}" Text="Fica só o ícone perto do relógio."/>
+                    <CheckBox x:Name="StartupBox" Content="Iniciar com o Windows (direto no segundo plano)" Click="Startup_Click"/>
+                    <TextBlock x:Name="StartupHint" Style="{StaticResource Hint}" Margin="26,2,0,0"
+                               Text="Necessário para as curvas de ventoinha e a iluminação funcionarem desde o login. Abre como administrador sem pedir confirmação."/>
+                </StackPanel>
+            </Border>
+
+            <!-- Aparência -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="APARÊNCIA" Style="{StaticResource Label}"/>
+                    <Grid Style="{StaticResource Row}">
+                        <TextBlock Text="Tamanho da interface" VerticalAlignment="Center"/>
+                        <ComboBox x:Name="ScaleBox" Width="160" HorizontalAlignment="Right" SelectionChanged="Scale_Changed">
+                            <ComboBoxItem Content="90% (compacto)" Tag="0.9"/>
+                            <ComboBoxItem Content="100%" Tag="1"/>
+                            <ComboBoxItem Content="110%" Tag="1.1"/>
+                            <ComboBoxItem Content="125% (grande)" Tag="1.25"/>
+                        </ComboBox>
+                    </Grid>
+                    <Grid>
+                        <TextBlock Text="Ao abrir o SoNexus, mostrar" VerticalAlignment="Center"/>
+                        <ComboBox x:Name="StartPageBox" Width="160" HorizontalAlignment="Right" SelectionChanged="StartPage_Changed">
+                            <ComboBoxItem Content="a última página"/>
+                            <ComboBoxItem Content="sempre o Início"/>
+                        </ComboBox>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Atalhos -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="ATALHOS DE TECLADO" Style="{StaticResource Label}"/>
+                    <CheckBox x:Name="HotkeyBox" Content="Atalhos que funcionam de qualquer lugar (inclusive dentro do jogo)" Click="Hotkey_Click"/>
+                    <Grid Margin="26,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="130"/>
+                            <ColumnDefinition/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                        </Grid.RowDefinitions>
+                        <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="4" Padding="8,2" HorizontalAlignment="Left" Margin="0,0,0,6">
+                            <TextBlock Text="Ctrl + Shift + S" FontFamily="Consolas"/>
+                        </Border>
+                        <TextBlock Grid.Column="1" Text="Abrir ou esconder o SoNexus" VerticalAlignment="Center" Margin="0,0,0,6"/>
+                        <Border Grid.Row="1" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="4" Padding="8,2" HorizontalAlignment="Left">
+                            <TextBlock Text="Ctrl + Shift + F" FontFamily="Consolas"/>
+                        </Border>
+                        <TextBlock Grid.Row="1" Grid.Column="1" Text="Mostrar ou esconder o painel de FPS sobre o jogo" VerticalAlignment="Center"/>
+                    </Grid>
+                    <TextBlock x:Name="HotkeyStatus" Style="{StaticResource Muted}" Margin="26,10,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Avisos -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="AVISOS" Style="{StaticResource Label}"/>
+                    <CheckBox x:Name="AlertBox" Content="Avisar quando esquentar demais (notificação do Windows)" Click="Option_Click"/>
+                    <Grid Margin="26,10,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="110"/>
+                            <ColumnDefinition Width="40"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="110"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Processador acima de" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <ComboBox x:Name="CpuAlertBox" Grid.Column="1" SelectionChanged="Alert_Changed"/>
+                        <TextBlock Grid.Column="3" Text="Placa de vídeo acima de" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <ComboBox x:Name="GpuAlertBox" Grid.Column="4" SelectionChanged="Alert_Changed"/>
+                    </Grid>
+                    <CheckBox x:Name="RamAlertBox" Content="Avisar quando a memória RAM estiver quase cheia" Click="Option_Click"/>
+                    <Grid Margin="26,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="110"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Uso da RAM acima de" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <ComboBox x:Name="RamAlertPctBox" Grid.Column="1" SelectionChanged="Alert_Changed"/>
+                    </Grid>
+                    <TextBlock Style="{StaticResource Muted}" Margin="26,10,0,10" TextWrapping="Wrap"
+                               Text="Funcionam com o SoNexus fechado na bandeja. No máximo um aviso a cada 10-15 minutos por item."/>
+                    <Button Content="Testar aviso" HorizontalAlignment="Left" Margin="26,0,0,0" Click="TestAlert_Click"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Desempenho -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="DESEMPENHO DO SONEXUS" Style="{StaticResource Label}"/>
+                    <Grid>
+                        <TextBlock Text="Atualizar sensores a cada" VerticalAlignment="Center"/>
+                        <ComboBox x:Name="IntervalBox" Width="160" HorizontalAlignment="Right" SelectionChanged="Interval_Changed">
+                            <ComboBoxItem Content="1 segundo" Tag="1000"/>
+                            <ComboBoxItem Content="2 segundos" Tag="2000"/>
+                            <ComboBoxItem Content="5 segundos" Tag="5000"/>
+                        </ComboBox>
+                    </Grid>
+                    <TextBlock Style="{StaticResource Muted}" Margin="0,4,0,12" TextWrapping="Wrap"
+                               Text="Intervalos maiores gastam menos CPU. Escondido na bandeja, o SoNexus já atualiza a cada 5 s e devolve a memória das telas ao Windows."/>
+                    <CheckBox x:Name="BatteryBox" Content="Economizar na bateria (notebook fora da tomada)" Click="Option_Click"/>
+                    <TextBlock Style="{StaticResource Hint}" Text="Sensores a cada 5 s e efeitos de iluminação mais lentos enquanto estiver na bateria. Volta ao normal na tomada."/>
+                    <Grid>
+                        <TextBlock x:Name="UsageText" Style="{StaticResource Muted}" VerticalAlignment="Center"/>
+                        <Button Content="Liberar memória do SoNexus agora" HorizontalAlignment="Right" Click="Trim_Click"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Privacidade -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="PRIVACIDADE" Style="{StaticResource Label}"/>
+                    <CheckBox x:Name="OnlineBox" Content="Permitir consultas na internet" Click="Option_Click"/>
+                    <TextBlock Style="{StaticResource Hint}" Margin="26,2,0,0"
+                               Text="Usadas para: requisitos dos jogos (loja Steam, para estimar FPS), seu IP público e operadora (Rede) e a lista atual de servidores da Valve (Rotas). Desligado, o SoNexus usa só o que já está no PC. Nada é enviado sobre você ou seu computador."/>
+                </StackPanel>
+            </Border>
+
+            <!-- Dados -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="DADOS DO SONEXUS" Style="{StaticResource Label}"/>
+                    <WrapPanel>
+                        <Button Content="Exportar configurações" Margin="0,0,8,8" Click="Export_Click"/>
+                        <Button Content="Importar configurações" Margin="0,0,8,8" Click="Import_Click"/>
+                        <Button Content="Limpar cache e registros" Margin="0,0,8,8" Click="ClearCache_Click"/>
+                        <Button Content="Restaurar padrões" Margin="0,0,8,8" Click="Reset_Click"/>
+                        <Button Content="Desinstalar o SoNexus" Margin="0,0,8,8" Click="Uninstall_Click"/>
+                    </WrapPanel>
+                    <TextBlock x:Name="DataStatus" Style="{StaticResource Muted}" TextWrapping="Wrap"
+                               Text="Exportar gera um arquivo com todas as suas escolhas (iluminação, painel de FPS, avisos...) para levar a outro PC."/>
+                </StackPanel>
+            </Border>
+
+            <!-- Sobre -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition/>
+                    </Grid.ColumnDefinitions>
+                    <Viewbox Width="44" Height="48" VerticalAlignment="Top" Margin="0,2,18,0">
+                        <Path Data="{StaticResource SoStudioMark}" Fill="White" Width="100" Height="100"/>
+                    </Viewbox>
+                    <StackPanel Grid.Column="1">
+                        <TextBlock x:Name="AboutTitle" Text="SoNexus" FontSize="20" FontWeight="SemiBold"/>
+                        <TextBlock Text="Criado por SoEuzinho · SoStudio" Margin="0,2,0,0"/>
+                        <TextBlock Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,12"
+                                   Text="Kit de ferramentas para PC Windows: sensores, otimização, drivers, jogos, rede, áudio, diagnóstico e iluminação."/>
+                        <WrapPanel>
+                            <Button Content="Termos de Uso e Privacidade" Margin="0,0,8,8" Click="Terms_Click"/>
+                            <Button Content="Abrir pasta de registros (log)" Margin="0,0,8,8" Click="OpenLog_Click"/>
+                            <Button Content="Licenças de terceiros" Margin="0,0,8,8" Click="Notices_Click"/>
+                        </WrapPanel>
+                        <TextBlock x:Name="TermsStatus" Style="{StaticResource Muted}" FontSize="11" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

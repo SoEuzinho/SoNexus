@@ -1,0 +1,132 @@
+﻿SONEXUS — TERMOS DE USO E POLÍTICA DE PRIVACIDADE
+Versão 1 — outubro de 2026
+SoNexus é um software da SoStudio, criado por SoEuzinho.
+
+Leia com atenção. Ao instalar ou usar o SoNexus, você declara que leu, entendeu e aceita
+estes termos. Se não concordar, não instale nem use o programa.
+
+
+1. O QUE É O SONEXUS
+
+O SoNexus é um programa gratuito para Windows que mostra informações do computador
+(sensores, peças, discos, rede, áudio, jogos) e permite fazer ajustes, como:
+otimizações do Windows, remoção de aplicativos, instalação e remoção de drivers,
+controle de ventoinhas, overclock da placa de vídeo, testes de estresse e benchmarks,
+controle de iluminação RGB e alterações de rede (DNS).
+
+O programa é fornecido gratuitamente, por um desenvolvedor independente, como está
+("no estado em que se encontra"), sem qualquer garantia de funcionamento, de resultado
+ou de adequação a uma finalidade específica.
+
+
+2. RISCOS E RESPONSABILIDADE DO USUÁRIO
+
+Algumas funções mexem em partes sensíveis do computador. Ao usá-las, você reconhece que:
+
+a) Ajustes do Windows, remoção de aplicativos e de drivers podem mudar o comportamento
+   do sistema. O SoNexus guarda backups para "Reverter", mas isso pode não desfazer tudo
+   em todos os casos. Crie um ponto de restauração (o próprio SoNexus oferece) e mantenha
+   cópias dos seus arquivos importantes antes de usar essas funções.
+
+b) Overclock, alteração de limites de energia e controle manual de ventoinhas podem causar
+   travamentos, perda de dados não salvos, superaquecimento, desgaste de peças e perda de
+   garantia do fabricante. O SoNexus tem travas de segurança (limites de temperatura,
+   rotação mínima, voltagem bloqueada), mas elas não eliminam todos os riscos.
+
+c) Testes de estresse e benchmarks levam as peças ao limite de propósito. Use-os com
+   refrigeração adequada e acompanhando as temperaturas.
+
+d) Instalação de drivers usa os instaladores oficiais dos fabricantes; problemas
+   causados por esses instaladores são de responsabilidade dos respectivos fabricantes.
+
+e) Você é o único responsável pelas ações que decidir executar no seu computador ou em
+   computadores de terceiros. Só use o SoNexus em computadores que sejam seus ou nos quais
+   você tenha autorização para fazer essas alterações.
+
+f) As estimativas mostradas (FPS esperado, gargalo, saúde de discos, consumo de energia,
+   custo na conta de luz etc.) são aproximações e não garantem resultados reais.
+
+
+3. LIMITAÇÃO DE RESPONSABILIDADE
+
+Na máxima extensão permitida pela legislação aplicável, o autor e a SoStudio não se
+responsabilizam por danos diretos ou indiretos, perda de dados, lucros cessantes,
+danos a hardware ou software, ou qualquer outro prejuízo decorrente do uso, do mau uso
+ou da impossibilidade de uso do SoNexus, inclusive quando o usuário tiver sido avisado
+dos riscos pelo próprio programa.
+
+Nada nestes termos afasta direitos que a lei garante de forma irrenunciável ao
+consumidor (Código de Defesa do Consumidor, Lei 8.078/1990).
+
+
+4. PRIVACIDADE E DADOS (LGPD — Lei 13.709/2018)
+
+4.1 O que fica no seu computador
+O SoNexus lê informações do seu computador (peças, sensores, programas instalados,
+conexões de rede, jogos instalados) somente para mostrá-las a você. Essas informações,
+suas configurações, registros de erro (log) e backups ficam apenas no seu computador:
+  - %LocalAppData%\SoNexus (configurações e registros)
+  - %ProgramData%\SoNexus (backups dos ajustes e instaladores baixados)
+
+4.2 O que NÃO fazemos
+O SoNexus não envia ao autor, à SoStudio ou a qualquer servidor próprio nenhum dado
+sobre você ou sobre o seu computador. Não há conta, cadastro, propaganda, rastreamento
+nem venda de dados.
+
+4.3 Consultas a serviços de terceiros (somente com a sua permissão)
+Algumas funções consultam serviços na internet. Como em qualquer acesso à internet,
+esses serviços recebem o seu endereço IP e seguem as políticas de privacidade deles:
+  - Loja Steam (Valve): requisitos dos jogos, para estimar o FPS; lista de servidores
+    de CS2/Dota 2 nas rotas de rede.
+  - ipinfo.io: seu IP público e sua operadora, na tela Rede.
+  - NVIDIA e AMD: verificar e baixar drivers de vídeo, quando você pedir.
+  - Microsoft (winget/Windows): instalar programas e atualizações, quando você pedir.
+  - Testes de ping e rotas: contato com os servidores de jogos escolhidos por você.
+Você pode desligar as consultas automáticas a qualquer momento em
+Configurações › Privacidade › "Permitir consultas na internet". Downloads de drivers e
+testes de rede só acontecem quando você clica para iniciá-los.
+
+4.4 Seus direitos
+Como os dados ficam só no seu computador, você tem controle total: pode apagá-los em
+Configurações › Dados ("Limpar cache e registros", "Restaurar padrões") ou ao desinstalar
+o SoNexus (opção "apagar também minhas configurações e backups").
+
+4.5 Registro do seu aceite
+Para comprovar que você aceitou estes termos, o SoNexus guarda no seu computador a versão
+dos termos aceita e a data do aceite. Esse registro não é enviado a ninguém.
+
+
+5. PROGRAMAS DE TERCEIROS
+
+O SoNexus usa bibliotecas e componentes de terceiros, cada um com a sua licença
+(veja o arquivo THIRD-PARTY-NOTICES.txt). O driver PawnIO, usado para ler sensores, é
+instalado somente se você pedir, a partir do instalador oficial e assinado do autor dele.
+Marcas citadas (NVIDIA, AMD, Intel, Microsoft, Steam, Valve, ASUS, entre outras)
+pertencem aos seus donos; o SoNexus não é afiliado a elas.
+
+
+6. LICENÇA DO CÓDIGO
+
+O código do SoNexus é distribuído sob a licença MIT (arquivo LICENSE), que também
+fornece o software "como está", sem garantias.
+
+
+7. MENORES DE IDADE
+
+Menores de 18 anos devem usar o SoNexus com o acompanhamento de um responsável,
+principalmente as funções de otimização, drivers, overclock e ventoinhas.
+
+
+8. ALTERAÇÕES DESTES TERMOS
+
+Estes termos podem ser atualizados em novas versões do SoNexus. Quando isso acontecer,
+o programa pedirá um novo aceite antes de continuar.
+
+
+9. LEI APLICÁVEL
+
+Estes termos seguem as leis da República Federativa do Brasil.
+
+
+Ao marcar "Li e aceito os Termos de Uso e a Política de Privacidade", você confirma que
+leu este documento por completo e concorda com ele.

@@ -1,0 +1,170 @@
+<UserControl x:Class="SoNexus.Views.FpsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:SoNexus.Controls">
+    <DockPanel>
+        <Grid DockPanel.Dock="Top" Margin="0,0,0,16">
+            <StackPanel Margin="0,0,420,0">
+                <TextBlock Text="Desempenho em jogos" Style="{StaticResource H1}"/>
+                <TextBlock Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,0" TextWrapping="Wrap"
+                           Text="Mede FPS, 1% low, engasgos e tempo de quadro de jogos DirectX 9/11/12, Vulkan e OpenGL, sem mexer no jogo (não ativa anti-cheat). Inicie a medição e abra o jogo."/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <CheckBox x:Name="OverlayBox" Content="Mostrar sobre o jogo" VerticalAlignment="Center" Margin="0,0,14,0" Click="Overlay_Click"/>
+                <Button x:Name="CopyButton" Content="Copiar relatório" Margin="0,0,8,0" Click="Copy_Click" IsEnabled="False"/>
+                <Button x:Name="ResetButton" Content="Zerar sessão" Margin="0,0,8,0" Click="Reset_Click" IsEnabled="False"/>
+                <Button x:Name="StartButton" Content="Iniciar medição" Style="{StaticResource PrimaryButton}" Click="Start_Click"/>
+                <Button x:Name="StopButton" Content="Parar" Visibility="Collapsed" Click="Stop_Click"/>
+            </StackPanel>
+        </Grid>
+
+        <DockPanel DockPanel.Dock="Right" Width="320" Margin="0,0,14,0">
+        <!-- O que aparece sobre o jogo -->
+        <Border DockPanel.Dock="Bottom" Style="{StaticResource Card}" Margin="0,14,0,0">
+            <StackPanel>
+                <TextBlock Text="Mostrar sobre o jogo" Style="{StaticResource H2}"/>
+                <TextBlock Style="{StaticResource Muted}" Margin="0,2,0,8" TextWrapping="Wrap"
+                           Text="O que aparece na tela durante o jogo (jogo em janela sem borda)."/>
+                <UniformGrid x:Name="OverlayItemsPanel" Columns="2"/>
+                <Grid Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition/>
+                    </Grid.ColumnDefinitions>
+                    <ComboBox x:Name="CornerBox" SelectionChanged="OverlayLayout_Changed">
+                        <ComboBoxItem Content="↖ Em cima, esq."/>
+                        <ComboBoxItem Content="↗ Em cima, dir."/>
+                        <ComboBoxItem Content="↙ Embaixo, esq."/>
+                        <ComboBoxItem Content="↘ Embaixo, dir."/>
+                    </ComboBox>
+                    <ComboBox x:Name="SizeBox" Grid.Column="2" SelectionChanged="OverlayLayout_Changed">
+                        <ComboBoxItem Content="Pequeno"/>
+                        <ComboBoxItem Content="Médio"/>
+                        <ComboBoxItem Content="Grande"/>
+                    </ComboBox>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- Processos -->
+        <Border Style="{StaticResource Card}">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Text="Programas com FPS" Style="{StaticResource H2}"/>
+                <TextBlock DockPanel.Dock="Top" Style="{StaticResource Muted}" Margin="0,2,0,10" TextWrapping="Wrap"
+                           Text="O jogo em primeiro plano é escolhido sozinho. Clique para fixar outro."/>
+                <TextBlock x:Name="NoProcess" DockPanel.Dock="Top" Style="{StaticResource Muted}" FontStyle="Italic"
+                           Text="Nenhum programa desenhando quadros ainda."/>
+                <ListBox x:Name="ProcessList" Background="Transparent" BorderThickness="0" SelectionChanged="Process_Selected">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <Border x:Name="bd" CornerRadius="6" Padding="10,6" Margin="0,0,0,4" Background="Transparent" Cursor="Hand">
+                                            <ContentPresenter/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="bd" Property="Background" Value="{StaticResource PanelHoverBrush}"/>
+                                            </Trigger>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="bd" Property="Background" Value="{StaticResource AccentSoftBrush}"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextBrush}" TextTrimming="CharacterEllipsis" Margin="0,0,70,0"/>
+                                <TextBlock Text="{Binding FpsText}" HorizontalAlignment="Right" Foreground="{StaticResource AccentBrush}"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+        </Border>
+        </DockPanel>
+
+        <!-- Números -->
+        <Grid DockPanel.Dock="Top">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="230"/>
+                <ColumnDefinition/>
+            </Grid.ColumnDefinitions>
+            <Border Style="{StaticResource Card}" Margin="0,0,14,14">
+                <StackPanel>
+                    <TextBlock x:Name="GameName" Text="NENHUM JOGO" Foreground="{StaticResource AccentBrush}" FontSize="11" FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock x:Name="FpsText" Text="—" FontSize="56" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="FrameTimeText" Style="{StaticResource Muted}" FontSize="12"/>
+                </StackPanel>
+            </Border>
+            <!-- Números da sessão: textos curtos, cabem mesmo com a janela no tamanho mínimo. -->
+            <UniformGrid Grid.Column="1" Columns="3">
+                <Border Style="{StaticResource Card}" Margin="0,0,14,14">
+                    <StackPanel>
+                        <TextBlock Text="MÉDIA" Foreground="{StaticResource AccentBrush}" FontSize="11" FontWeight="Bold"/>
+                        <TextBlock x:Name="AvgText" Text="—" FontSize="28" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="DurationText" Style="{StaticResource Muted}" TextWrapping="Wrap" Text="da sessão"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource Card}" Margin="0,0,14,14">
+                    <StackPanel>
+                        <TextBlock Text="1% LOW" Foreground="{StaticResource AccentBrush}" FontSize="11" FontWeight="Bold"/>
+                        <TextBlock x:Name="Low1Text" Text="—" FontSize="28" FontWeight="SemiBold"/>
+                        <TextBlock Text="os 1% piores quadros" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource Card}" Margin="0,0,14,14">
+                    <StackPanel>
+                        <TextBlock Text="0,1% LOW" Foreground="{StaticResource AccentBrush}" FontSize="11" FontWeight="Bold"/>
+                        <TextBlock x:Name="Low01Text" Text="—" FontSize="28" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="StutterText" Style="{StaticResource Muted}" TextWrapping="Wrap" Text="engasgos"/>
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+        </Grid>
+
+        <Grid DockPanel.Dock="Top">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition/>
+                <ColumnDefinition Width="300"/>
+            </Grid.ColumnDefinitions>
+            <Border Style="{StaticResource Card}" Margin="0,0,14,14">
+                <StackPanel>
+                    <TextBlock Text="DIAGNÓSTICO AO VIVO" Foreground="{StaticResource AccentBrush}" FontSize="11" FontWeight="Bold"/>
+                    <TextBlock x:Name="DiagnosisTitle" Text="Inicie a medição e jogue por alguns segundos." FontSize="16" FontWeight="SemiBold" Margin="0,4,0,2" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="DiagnosisText" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="1" Style="{StaticResource Card}" Margin="0,0,14,14">
+                <StackPanel>
+                    <TextBlock Text="HARDWARE AGORA" Foreground="{StaticResource AccentBrush}" FontSize="11" FontWeight="Bold"/>
+                    <TextBlock x:Name="CpuText" Text="CPU —" FontSize="13" Margin="0,6,0,2" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="GpuText" Text="GPU —" FontSize="13" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="RamText" Text="RAM —" FontSize="13" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="BottleneckText" Style="{StaticResource Muted}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <UniformGrid Rows="2">
+            <Border Style="{StaticResource Card}" Margin="0,0,14,14">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="FPS" Style="{StaticResource H2}" Margin="0,0,0,6"/>
+                    <c:LineChart x:Name="FpsChart" Unit="" Capacity="180"/>
+                </DockPanel>
+            </Border>
+            <Border Style="{StaticResource Card}" Margin="0,0,14,0">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="Tempo de quadro (picos = engasgos)" Style="{StaticResource H2}" Margin="0,0,0,6"/>
+                    <c:LineChart x:Name="FrameChart" Unit="ms" Capacity="600"/>
+                </DockPanel>
+            </Border>
+        </UniformGrid>
+    </DockPanel>
+</UserControl>

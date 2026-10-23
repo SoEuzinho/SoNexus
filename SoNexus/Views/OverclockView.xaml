@@ -1,0 +1,208 @@
+<UserControl x:Class="SoNexus.Views.OverclockView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Loaded="OnLoaded" Unloaded="OnUnloaded">
+    <UserControl.Resources>
+        <Style x:Key="CurveSlider" TargetType="Slider">
+            <Setter Property="Orientation" Value="Vertical"/>
+            <Setter Property="Height" Value="90"/>
+            <Setter Property="Minimum" Value="20"/>
+            <Setter Property="Maximum" Value="100"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+    </UserControl.Resources>
+
+    <DockPanel>
+        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,14">
+            <TextBlock Text="Overclock e ventoinhas" Style="{StaticResource H1}"/>
+            <TextBlock Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,0" TextWrapping="Wrap"
+                       Text="Ajuste o limite de energia e os clocks da placa NVIDIA e controle as ventoinhas com curvas de temperatura, como o MSI Afterburner. Depois de mexer no clock, valide com o Stress test e jogando."/>
+
+            <!-- Aviso de risco: vermelho porque é perigo real (travamentos, perda de dados, garantia). -->
+            <Border x:Name="RulesCard" BorderBrush="{StaticResource DangerBrush}" BorderThickness="1" CornerRadius="10" Padding="16" Margin="0,14,0,0"
+                    Background="{StaticResource PanelBrush}">
+                <StackPanel>
+                    <TextBlock Text="⚠  Overclock é por sua conta e risco" Foreground="{StaticResource DangerBrush}" FontSize="15" FontWeight="SemiBold"/>
+                    <TextBlock Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,8"
+                               Text="Clock acima do de fábrica pode causar tela azul, jogo fechando, artefatos (riscos coloridos na tela), arquivos corrompidos e, em casos extremos, desgaste da placa. Fabricantes podem negar garantia. O SoNexus não aumenta tensão (voltagem): isso é o que realmente estraga peças, e fica bloqueado de propósito."/>
+                    <TextBlock Text="REGRAS DE SEGURANÇA" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,4"/>
+                    <TextBlock TextWrapping="Wrap" LineHeight="20" Foreground="{StaticResource TextBrush}">
+                        1. Suba devagar: +15 a +25 MHz no núcleo e +50 a +100 MHz na memória por vez.<LineBreak/>
+                        2. A cada passo, rode o Stress test da placa por 10 minutos e jogue 30 minutos.<LineBreak/>
+                        3. Travou, deu artefato ou tela azul? Volte ao último valor estável e tire mais 15 MHz.<LineBreak/>
+                        4. Temperatura da placa abaixo de 83 °C (hot spot abaixo de 100 °C). Acima disso, pare.<LineBreak/>
+                        5. Notebook: prefira só reduzir o limite de energia (menos calor e barulho).<LineBreak/>
+                        6. Os clocks voltam ao normal ao reiniciar o PC. Não use overclock em PC de trabalho com arquivos importantes sem backup.
+                    </TextBlock>
+                    <CheckBox x:Name="RulesBox" Margin="0,12,0,0" Click="Rules_Click"
+                              Content="Li as regras e entendo os riscos. Liberar os controles de overclock."/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="420"/>
+                <ColumnDefinition/>
+            </Grid.ColumnDefinitions>
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,0,14,0">
+                <StackPanel>
+                    <!-- GPU -->
+                    <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                        <StackPanel>
+                            <TextBlock x:Name="GpuName" Text="Placa de vídeo" Style="{StaticResource H2}"/>
+                            <TextBlock x:Name="GpuLive" Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,12" TextWrapping="Wrap"/>
+
+                            <StackPanel x:Name="OcPanel">
+                                <Grid>
+                                    <TextBlock Text="Limite de energia" FontWeight="SemiBold"/>
+                                    <TextBlock x:Name="PowerValue" HorizontalAlignment="Right" Foreground="{StaticResource AccentBrush}"/>
+                                </Grid>
+                                <Slider x:Name="PowerSlider" Margin="0,4,0,14" ValueChanged="Slider_Changed"/>
+
+                                <Grid>
+                                    <TextBlock Text="Clock do núcleo (offset)" FontWeight="SemiBold"/>
+                                    <TextBlock x:Name="CoreValue" HorizontalAlignment="Right" Foreground="{StaticResource AccentBrush}"/>
+                                </Grid>
+                                <Slider x:Name="CoreSlider" Margin="0,4,0,14" SmallChange="5" LargeChange="25" ValueChanged="Slider_Changed"/>
+
+                                <Grid>
+                                    <TextBlock Text="Clock da memória (offset)" FontWeight="SemiBold"/>
+                                    <TextBlock x:Name="MemValue" HorizontalAlignment="Right" Foreground="{StaticResource AccentBrush}"/>
+                                </Grid>
+                                <Slider x:Name="MemSlider" Margin="0,4,0,14" SmallChange="10" LargeChange="50" ValueChanged="Slider_Changed"/>
+
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="Aplicar" Style="{StaticResource PrimaryButton}" Margin="0,0,8,0" Click="Apply_Click"/>
+                                    <Button Content="Restaurar padrão" Click="Reset_Click"/>
+                                </StackPanel>
+                            </StackPanel>
+                            <TextBlock x:Name="OcStatus" Style="{StaticResource Muted}" Margin="0,10,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Plano de energia -->
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Plano de energia" Style="{StaticResource H2}"/>
+                            <TextBlock Style="{StaticResource Muted}" Margin="0,2,0,10" TextWrapping="Wrap"
+                                       Text="&quot;Desempenho Máximo&quot; mantém a CPU sempre pronta. Em notebook, gasta mais bateria."/>
+                            <ComboBox x:Name="PlanBox" DisplayMemberPath="Display" Margin="0,0,0,10"/>
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="Ativar plano" Margin="0,0,8,0" Click="ActivatePlan_Click"/>
+                                <Button Content="Criar Desempenho Máximo" Click="AddUltimate_Click"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- Ventoinhas -->
+            <DockPanel Grid.Column="1">
+                <StackPanel DockPanel.Dock="Top" Margin="0,0,14,10">
+                    <TextBlock Text="Ventoinhas" Style="{StaticResource H2}"/>
+                    <TextBlock x:Name="FanStatus" Style="{StaticResource Muted}" Margin="0,2,0,0" TextWrapping="Wrap"
+                               Text="O controle só funciona com o SoNexus aberto. Ao fechar, as ventoinhas voltam para o automático da placa. Mínimo de segurança: 20%."/>
+                </StackPanel>
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ItemsControl x:Name="FanList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource Card}" Margin="0,0,14,12">
+                                    <StackPanel>
+                                        <Grid>
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold"/>
+                                                <TextBlock Text="{Binding Status}" Style="{StaticResource Muted}"/>
+                                            </StackPanel>
+                                            <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Rpm}" Style="{StaticResource Muted}" FontSize="13" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                                <TextBlock Text="{Binding Percent}" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" Margin="0,0,14,0"/>
+                                                <ComboBox Width="130" SelectedIndex="{Binding ModeIndex}" VerticalAlignment="Center">
+                                                    <ComboBoxItem Content="Automático"/>
+                                                    <ComboBoxItem Content="Fixo"/>
+                                                    <ComboBoxItem Content="Curva"/>
+                                                </ComboBox>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <!-- Fixo -->
+                                        <Grid Margin="0,12,0,0">
+                                            <Grid.Style>
+                                                <Style TargetType="Grid">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsFixed}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Grid.Style>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition/>
+                                                <ColumnDefinition Width="50"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Slider Minimum="20" Maximum="100" Value="{Binding Fixed}" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="1" TextAlignment="Right" VerticalAlignment="Center">
+                                                <Run Text="{Binding Fixed, Mode=OneWay}"/>%
+                                            </TextBlock>
+                                        </Grid>
+
+                                        <!-- Curva -->
+                                        <StackPanel Margin="0,12,0,0">
+                                            <StackPanel.Style>
+                                                <Style TargetType="StackPanel">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsCurve}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </StackPanel.Style>
+                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                                <TextBlock Text="Seguir a temperatura da" Style="{StaticResource Muted}" FontSize="13" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                <ComboBox Width="90" SelectedIndex="{Binding SourceIndex}">
+                                                    <ComboBoxItem Content="CPU"/>
+                                                    <ComboBoxItem Content="GPU"/>
+                                                </ComboBox>
+                                            </StackPanel>
+                                            <UniformGrid Columns="5">
+                                                <StackPanel>
+                                                    <TextBlock HorizontalAlignment="Center"><Run Text="{Binding P30, Mode=OneWay}"/>%</TextBlock>
+                                                    <Slider Style="{StaticResource CurveSlider}" Value="{Binding P30}"/>
+                                                    <TextBlock Text="30 °C" Style="{StaticResource Muted}" HorizontalAlignment="Center"/>
+                                                </StackPanel>
+                                                <StackPanel>
+                                                    <TextBlock HorizontalAlignment="Center"><Run Text="{Binding P45, Mode=OneWay}"/>%</TextBlock>
+                                                    <Slider Style="{StaticResource CurveSlider}" Value="{Binding P45}"/>
+                                                    <TextBlock Text="45 °C" Style="{StaticResource Muted}" HorizontalAlignment="Center"/>
+                                                </StackPanel>
+                                                <StackPanel>
+                                                    <TextBlock HorizontalAlignment="Center"><Run Text="{Binding P60, Mode=OneWay}"/>%</TextBlock>
+                                                    <Slider Style="{StaticResource CurveSlider}" Value="{Binding P60}"/>
+                                                    <TextBlock Text="60 °C" Style="{StaticResource Muted}" HorizontalAlignment="Center"/>
+                                                </StackPanel>
+                                                <StackPanel>
+                                                    <TextBlock HorizontalAlignment="Center"><Run Text="{Binding P75, Mode=OneWay}"/>%</TextBlock>
+                                                    <Slider Style="{StaticResource CurveSlider}" Value="{Binding P75}"/>
+                                                    <TextBlock Text="75 °C" Style="{StaticResource Muted}" HorizontalAlignment="Center"/>
+                                                </StackPanel>
+                                                <StackPanel>
+                                                    <TextBlock HorizontalAlignment="Center"><Run Text="{Binding P90, Mode=OneWay}"/>%</TextBlock>
+                                                    <Slider Style="{StaticResource CurveSlider}" Value="{Binding P90}"/>
+                                                    <TextBlock Text="90 °C" Style="{StaticResource Muted}" HorizontalAlignment="Center"/>
+                                                </StackPanel>
+                                            </UniformGrid>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+        </Grid>
+    </DockPanel>
+</UserControl>

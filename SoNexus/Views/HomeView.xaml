@@ -1,0 +1,123 @@
+<UserControl x:Class="SoNexus.Views.HomeView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:SoNexus.Controls"
+             Loaded="OnLoaded" Unloaded="OnUnloaded">
+    <UserControl.Resources>
+        <Style x:Key="TileLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
+        </Style>
+        <Style x:Key="TileValue" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="34"/>
+            <Setter Property="FontWeight" Value="Light"/>
+            <Setter Property="Margin" Value="0,2,0,0"/>
+        </Style>
+        <DataTemplate x:Key="LineTemplate">
+            <Grid Margin="0,3">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock TextTrimming="CharacterEllipsis" Margin="0,0,10,0">
+                    <Run Text="{Binding Name, Mode=OneWay}"/>
+                    <Run Text="{Binding Source, Mode=OneWay}" Foreground="#5C5C5C" FontSize="11"/>
+                </TextBlock>
+                <TextBlock Grid.Column="1" Text="{Binding Value}" FontFamily="Consolas"/>
+            </Grid>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="0,0,14,0">
+            <TextBlock Text="Início" Style="{StaticResource H1}"/>
+            <TextBlock x:Name="Subtitle" Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,20" Text="Carregando sensores..."/>
+            <v:SensorDriverBanner xmlns:v="clr-namespace:SoNexus.Views"/>
+
+            <Border x:Name="Banner" Visibility="Collapsed" Style="{StaticResource Card}" Margin="0,0,0,14" Padding="14,10">
+                <TextBlock x:Name="BannerText" TextWrapping="Wrap"/>
+            </Border>
+
+            <!-- Quatro blocos principais com gráfico -->
+            <UniformGrid Columns="4">
+                <Border Style="{StaticResource Card}" Margin="0,0,12,12">
+                    <StackPanel>
+                        <TextBlock Text="PROCESSADOR" Style="{StaticResource TileLabel}"/>
+                        <TextBlock x:Name="CpuValue" Text="—" Style="{StaticResource TileValue}"/>
+                        <TextBlock x:Name="CpuDetail" Style="{StaticResource Muted}"/>
+                        <c:LineChart x:Name="CpuChart" Height="70" Margin="0,12,0,0" FixedMin="0" FixedMax="100" Capacity="120"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource Card}" Margin="0,0,12,12">
+                    <StackPanel>
+                        <TextBlock Text="PLACA DE VÍDEO" Style="{StaticResource TileLabel}"/>
+                        <TextBlock x:Name="GpuValue" Text="—" Style="{StaticResource TileValue}"/>
+                        <TextBlock x:Name="GpuDetail" Style="{StaticResource Muted}"/>
+                        <c:LineChart x:Name="GpuChart" Height="70" Margin="0,12,0,0" FixedMin="0" FixedMax="100" Capacity="120"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource Card}" Margin="0,0,12,12">
+                    <StackPanel>
+                        <TextBlock Text="MEMÓRIA" Style="{StaticResource TileLabel}"/>
+                        <TextBlock x:Name="RamValue" Text="—" Style="{StaticResource TileValue}"/>
+                        <TextBlock x:Name="RamDetail" Style="{StaticResource Muted}"/>
+                        <c:LineChart x:Name="RamChart" Height="70" Margin="0,12,0,0" FixedMin="0" FixedMax="100" Capacity="120"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource Card}" Margin="0,0,12,12">
+                    <StackPanel>
+                        <TextBlock Text="REDE" Style="{StaticResource TileLabel}"/>
+                        <TextBlock x:Name="NetValue" Text="—" Style="{StaticResource TileValue}"/>
+                        <TextBlock x:Name="NetDetail" Style="{StaticResource Muted}"/>
+                        <c:LineChart x:Name="NetChart" Height="70" Margin="0,12,0,0" Unit="Mb" Capacity="120"/>
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+
+            <!-- Temperaturas em gráfico -->
+            <UniformGrid Columns="2">
+                <Border Style="{StaticResource Card}" Margin="0,0,12,12">
+                    <StackPanel>
+                        <Grid>
+                            <TextBlock Text="TEMPERATURA DA CPU" Style="{StaticResource TileLabel}"/>
+                            <TextBlock x:Name="CpuTempText" HorizontalAlignment="Right" FontFamily="Consolas"/>
+                        </Grid>
+                        <c:LineChart x:Name="CpuTempChart" Height="110" Margin="0,10,0,0" Unit="°C" FixedMin="20" FixedMax="100" Capacity="180"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource Card}" Margin="0,0,12,12">
+                    <StackPanel>
+                        <Grid>
+                            <TextBlock Text="TEMPERATURA DA GPU" Style="{StaticResource TileLabel}"/>
+                            <TextBlock x:Name="GpuTempText" HorizontalAlignment="Right" FontFamily="Consolas"/>
+                        </Grid>
+                        <c:LineChart x:Name="GpuTempChart" Height="110" Margin="0,10,0,0" Unit="°C" FixedMin="20" FixedMax="100" Capacity="180"/>
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+
+            <!-- Todos os sensores importantes -->
+            <UniformGrid Columns="3">
+                <Border Style="{StaticResource Card}" Margin="0,0,12,12" VerticalAlignment="Top">
+                    <StackPanel>
+                        <TextBlock Text="TEMPERATURAS" Style="{StaticResource TileLabel}" Margin="0,0,0,8"/>
+                        <ItemsControl x:Name="TempList" ItemTemplate="{StaticResource LineTemplate}"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource Card}" Margin="0,0,12,12" VerticalAlignment="Top">
+                    <StackPanel>
+                        <TextBlock Text="VENTOINHAS E CLOCKS" Style="{StaticResource TileLabel}" Margin="0,0,0,8"/>
+                        <ItemsControl x:Name="FanList" ItemTemplate="{StaticResource LineTemplate}"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource Card}" Margin="0,0,12,12" VerticalAlignment="Top">
+                    <StackPanel>
+                        <TextBlock Text="ENERGIA E TENSÕES" Style="{StaticResource TileLabel}" Margin="0,0,0,8"/>
+                        <ItemsControl x:Name="PowerList" ItemTemplate="{StaticResource LineTemplate}"/>
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

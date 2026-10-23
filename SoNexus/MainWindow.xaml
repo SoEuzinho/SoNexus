@@ -1,0 +1,62 @@
+﻿<Window x:Class="SoNexus.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="SoNexus" Width="1320" Height="860" MinWidth="1060" MinHeight="660"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BgBrush}" Foreground="{StaticResource TextBrush}"
+        FontFamily="Segoe UI Variable Text, Segoe UI"
+        SourceInitialized="OnSourceInitialized" StateChanged="OnStateChanged" Closing="OnClosing">
+    <Grid x:Name="RootGrid">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="220"/>
+            <ColumnDefinition/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Menu lateral -->
+        <Border Background="{StaticResource SidebarBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,1,0">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="24,28,0,30">
+                    <!-- Símbolo SoStudio -->
+                    <Viewbox Width="26" Height="28" VerticalAlignment="Center">
+                        <Path Data="{StaticResource SoStudioMark}" Fill="White" Width="100" Height="100"/>
+                    </Viewbox>
+                    <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="SoNexus" FontSize="18" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="VersionText" Text="por SoStudio" Style="{StaticResource Muted}" FontSize="10.5"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel DockPanel.Dock="Bottom" Margin="0,0,0,18">
+                    <RadioButton x:Name="NavSettings" Style="{StaticResource NavButton}" GroupName="Nav" Tag="&#xE713;" Content="Configurações" Checked="Nav_Checked"/>
+                    <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Margin="24,12,20,0" Padding="0,12,0,0">
+                        <StackPanel>
+                            <TextBlock x:Name="AdminText" Style="{StaticResource Muted}" FontSize="11" TextWrapping="Wrap"/>
+                            <Grid Margin="0,10,0,0">
+                                <TextBlock Text="Criado por SoEuzinho" Style="{StaticResource Muted}" FontSize="10.5" VerticalAlignment="Center"/>
+                                <!-- Desligar: fecha de vez (o X da janela só esconde na bandeja, se essa opção estiver ligada). -->
+                                <Button HorizontalAlignment="Right" Padding="8,4" Click="Quit_Click" ToolTip="Fechar o SoNexus completamente">
+                                    <TextBlock Text="&#xE7E8;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="12"/>
+                                </Button>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <StackPanel>
+                    <RadioButton x:Name="NavHome" Style="{StaticResource NavButton}" GroupName="Nav" Tag="&#xE80F;" Content="Início" Checked="Nav_Checked"/>
+                    <RadioButton x:Name="NavHardware" Style="{StaticResource NavButton}" GroupName="Nav" Tag="&#xE950;" Content="Hardware" Checked="Nav_Checked"/>
+                    <RadioButton x:Name="NavOptim" Style="{StaticResource NavButton}" GroupName="Nav" Tag="&#xE9F5;" Content="Otimização" Checked="Nav_Checked"/>
+                    <RadioButton x:Name="NavDrivers" Style="{StaticResource NavButton}" GroupName="Nav" Tag="&#xE895;" Content="Drivers" Checked="Nav_Checked"/>
+                    <RadioButton x:Name="NavGames" Style="{StaticResource NavButton}" GroupName="Nav" Tag="&#xE7FC;" Content="Jogos" Checked="Nav_Checked"/>
+                    <RadioButton x:Name="NavNetwork" Style="{StaticResource NavButton}" GroupName="Nav" Tag="&#xE968;" Content="Rede" Checked="Nav_Checked"/>
+                    <RadioButton x:Name="NavAudio" Style="{StaticResource NavButton}" GroupName="Nav" Tag="&#xE767;" Content="Áudio" Checked="Nav_Checked"/>
+                    <RadioButton x:Name="NavDiag" Style="{StaticResource NavButton}" GroupName="Nav" Tag="&#xE9D9;" Content="Diagnóstico" Checked="Nav_Checked"/>
+                    <RadioButton x:Name="NavIntegration" Style="{StaticResource NavButton}" GroupName="Nav" Tag="&#xE71B;" Content="Integração" Checked="Nav_Checked"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Conteúdo -->
+        <ContentControl x:Name="ContentHost" Grid.Column="1" Margin="36,30,22,20"/>
+    </Grid>
+</Window>

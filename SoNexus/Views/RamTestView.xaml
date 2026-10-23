@@ -1,0 +1,65 @@
+<UserControl x:Class="SoNexus.Views.RamTestView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Loaded="OnLoaded">
+    <DockPanel>
+        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,16">
+            <TextBlock Text="Teste de RAM" Style="{StaticResource H1}"/>
+            <TextBlock Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,0" TextWrapping="Wrap"
+                       Text="Grava e confere 9 padrões de bits na memória livre, em todos os núcleos (como o MemTest86). Testa a RAM que o Windows não está usando; feche outros programas para testar mais."/>
+        </StackPanel>
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="360"/>
+                <ColumnDefinition/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Margin="0,0,14,0">
+                <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                    <StackPanel x:Name="SetupPanel">
+                        <TextBlock Text="Quanto testar" Style="{StaticResource H2}"/>
+                        <TextBlock x:Name="AmountText" Style="{StaticResource Muted}" FontSize="13" Margin="0,6,0,6"/>
+                        <Slider x:Name="PercentSlider" Minimum="10" Maximum="90" Value="70" TickFrequency="5"
+                                IsSnapToTickEnabled="True" ValueChanged="Percent_Changed"/>
+                        <TextBlock Text="Passagens" Style="{StaticResource H2}" Margin="0,14,0,6"/>
+                        <ComboBox x:Name="PassesBox" SelectedIndex="0">
+                            <ComboBoxItem Content="1 passagem (rápido)" Tag="1"/>
+                            <ComboBoxItem Content="2 passagens" Tag="2"/>
+                            <ComboBoxItem Content="4 passagens (recomendado para overclock)" Tag="4"/>
+                            <ComboBoxItem Content="Sem limite (até parar)" Tag="0"/>
+                        </ComboBox>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="ERROS" Foreground="{StaticResource AccentBrush}" FontSize="11" FontWeight="Bold"/>
+                        <TextBlock x:Name="ErrorsText" Text="—" FontSize="44" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="VerdictText" Style="{StaticResource Muted}" FontSize="13" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="PhaseText" Style="{StaticResource Muted}" FontSize="13" Margin="0,14,0,0" TextWrapping="Wrap"/>
+                        <ProgressBar x:Name="ProgressBar" Style="{StaticResource Meter}" Margin="0,8,0,16"/>
+                        <Button x:Name="StartButton" Content="Iniciar teste" Style="{StaticResource PrimaryButton}" Click="Start_Click"/>
+                        <Button x:Name="StopButton" Content="Parar" Visibility="Collapsed" Click="Stop_Click"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <Border Grid.Column="1" Style="{StaticResource Card}" Padding="0">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="Erros encontrados" Style="{StaticResource H2}" Margin="16,14,0,8"/>
+                    <DataGrid x:Name="ErrorGrid">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Passagem" Binding="{Binding Pass, Mode=OneWay}" Width="80"/>
+                            <DataGridTextColumn Header="Padrão" Binding="{Binding Pattern, Mode=OneWay}" Width="150"/>
+                            <DataGridTextColumn Header="Posição" Binding="{Binding OffsetText, Mode=OneWay}" Width="120"/>
+                            <DataGridTextColumn Header="Esperado" Binding="{Binding ExpectedText, Mode=OneWay}" Width="160"/>
+                            <DataGridTextColumn Header="Lido" Binding="{Binding ActualText, Mode=OneWay}" Width="160"/>
+                            <DataGridTextColumn Header="Bits errados" Binding="{Binding BitsText, Mode=OneWay}" Width="*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </DockPanel>
+</UserControl>

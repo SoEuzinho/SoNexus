@@ -1,0 +1,135 @@
+<UserControl x:Class="SoNexus.Views.EnergyView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:SoNexus.Controls"
+             Loaded="OnLoaded" Unloaded="OnUnloaded">
+    <UserControl.Resources>
+        <Style x:Key="Label" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
+        </Style>
+        <Style x:Key="Big" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="34"/>
+            <Setter Property="FontWeight" Value="Light"/>
+            <Setter Property="Margin" Value="0,2,0,0"/>
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="0,0,14,0">
+            <TextBlock Text="Energia e tensões" Style="{StaticResource H1}"/>
+            <TextBlock x:Name="Subtitle" Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,20" TextWrapping="Wrap"
+                       Text="Quanto o PC consome, quanto isso custa na conta de luz e se as tensões da fonte estão normais."/>
+            <v:SensorDriverBanner xmlns:v="clr-namespace:SoNexus.Views"/>
+
+            <UniformGrid Columns="3">
+                <Border Style="{StaticResource Card}" Margin="0,0,12,12">
+                    <StackPanel>
+                        <TextBlock Text="CONSUMO AGORA (PC INTEIRO)" Style="{StaticResource Label}"/>
+                        <TextBlock x:Name="TotalText" Text="—" Style="{StaticResource Big}"/>
+                        <TextBlock x:Name="TotalDetail" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource Card}" Margin="0,0,12,12">
+                    <StackPanel>
+                        <TextBlock Text="DESDE QUE O SONEXUS ABRIU" Style="{StaticResource Label}"/>
+                        <TextBlock x:Name="SessionText" Text="—" Style="{StaticResource Big}"/>
+                        <TextBlock x:Name="SessionDetail" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource Card}" Margin="0,0,12,12">
+                    <StackPanel>
+                        <TextBlock Text="CUSTO ESTIMADO POR MÊS" Style="{StaticResource Label}"/>
+                        <TextBlock x:Name="MonthText" Text="—" Style="{StaticResource Big}"/>
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="70"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="50"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="R$/kWh " Style="{StaticResource Muted}" VerticalAlignment="Center"/>
+                            <TextBox x:Name="TariffBox" Grid.Column="1" Padding="6,3" LostFocus="Settings_Changed"/>
+                            <TextBlock Grid.Column="2" Text="  horas/dia " Style="{StaticResource Muted}" VerticalAlignment="Center"/>
+                            <TextBox x:Name="HoursBox" Grid.Column="3" Padding="6,3" LostFocus="Settings_Changed"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+
+            <Border Style="{StaticResource Card}" Margin="0,0,12,12">
+                <StackPanel>
+                    <Grid>
+                        <TextBlock Text="CONSUMO NOS ÚLTIMOS MINUTOS (W)" Style="{StaticResource Label}"/>
+                        <TextBlock HorizontalAlignment="Right" Style="{StaticResource Muted}">
+                            <Run Text="━ total" Foreground="White"/>   <Run Text="━ placa de vídeo" Foreground="#8C8C8C"/>   <Run Text="━ processador" Foreground="#4D4D4D"/>
+                        </TextBlock>
+                    </Grid>
+                    <Grid Height="140" Margin="0,10,0,0">
+                        <c:LineChart x:Name="TotalChart" Unit="W" Capacity="300"/>
+                        <c:LineChart x:Name="GpuChart" Unit="" Capacity="300"/>
+                        <c:LineChart x:Name="CpuChart" Unit="" Capacity="300"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <UniformGrid Columns="2">
+                <Border Style="{StaticResource Card}" Margin="0,0,12,12" VerticalAlignment="Top">
+                    <StackPanel>
+                        <TextBlock Text="DIVISÃO DO CONSUMO" Style="{StaticResource Label}" Margin="0,0,0,10"/>
+                        <ItemsControl x:Name="SplitList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="170"/>
+                                            <ColumnDefinition/>
+                                            <ColumnDefinition Width="70"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/>
+                                        <ProgressBar Grid.Column="1" Style="{StaticResource Meter}" Foreground="White" Value="{Binding Percent, Mode=OneWay}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding Value}" TextAlignment="Right" FontFamily="Consolas"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Style="{StaticResource Muted}" Margin="0,10,0,0" TextWrapping="Wrap"
+                                   Text="Processador e placa de vídeo são medidos pelos sensores. O resto (placa-mãe, RAM, discos, ventoinhas) é estimado. O monitor não está incluído."/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource Card}" Margin="0,0,12,12" VerticalAlignment="Top">
+                    <StackPanel>
+                        <TextBlock Text="FONTE RECOMENDADA" Style="{StaticResource Label}"/>
+                        <TextBlock x:Name="PsuText" Text="—" Style="{StaticResource Big}"/>
+                        <TextBlock x:Name="PsuDetail" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+
+            <Border Style="{StaticResource Card}" Margin="0,0,12,12" Padding="0">
+                <StackPanel>
+                    <TextBlock Text="TENSÕES" Style="{StaticResource Label}" Margin="18,16,0,4"/>
+                    <TextBlock x:Name="VoltageSummary" Style="{StaticResource Muted}" Margin="18,0,18,10" TextWrapping="Wrap"/>
+                    <DataGrid x:Name="VoltageGrid" RowHeight="NaN" MinRowHeight="30" MaxHeight="420">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Tensão" Binding="{Binding Name, Mode=OneWay}" Width="180"/>
+                            <DataGridTextColumn Header="Origem" Binding="{Binding Source, Mode=OneWay}" Width="190"/>
+                            <DataGridTextColumn Header="Atual" Binding="{Binding Value, Mode=OneWay}" Width="90"/>
+                            <DataGridTextColumn Header="Mín" Binding="{Binding Min, Mode=OneWay}" Width="70"/>
+                            <DataGridTextColumn Header="Máx" Binding="{Binding Max, Mode=OneWay}" Width="70"/>
+                            <DataGridTextColumn Header="Situação" Binding="{Binding Status, Mode=OneWay}" Width="*">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="TextWrapping" Value="Wrap"/>
+                                        <Setter Property="Margin" Value="0,6"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

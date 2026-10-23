@@ -1,0 +1,15 @@
+# Compilação
+bin/
+obj/
+publish/
+installer/Output/
+
+# Versões portáteis e zips gerados (vão para a página de Releases, não para o código)
+SoNexus-*/
+SoNexus-Portatil/
+*.zip
+
+# IDE
+.vs/
+*.user
+.claude/
