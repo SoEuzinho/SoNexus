@@ -14,6 +14,10 @@ public sealed class DiskHealth
     public int Index { get; init; }
     public string Model { get; init; } = "";
     public string Type { get; init; } = "";
+    public bool IsHdd { get; init; }
+    public bool IsNvme { get; init; }
+    public bool IsUsb { get; init; }
+    public int? Rpm { get; init; }
     public ulong Size { get; init; }
     public string Firmware { get; set; } = "";
     public string Serial { get; init; } = "";
@@ -59,19 +63,32 @@ public static class StorageService
         try
         {
             using var s = new ManagementObjectSearcher(@"root\Microsoft\Windows\Storage",
-                "SELECT DeviceId, FriendlyName, MediaType, BusType, Size, HealthStatus, SerialNumber, FirmwareVersion FROM MSFT_PhysicalDisk");
+                "SELECT DeviceId, FriendlyName, MediaType, BusType, SpindleSpeed, Size, HealthStatus, SerialNumber, FirmwareVersion FROM MSFT_PhysicalDisk");
             foreach (ManagementObject o in s.Get())
             {
                 using (o)
                 {
                     var media = Convert.ToInt32(o["MediaType"] ?? 0);
                     var bus = Convert.ToInt32(o["BusType"] ?? 0);
-                    var type = bus == 17 ? "SSD NVMe" : media == 4 ? "SSD SATA" : media == 3 ? "HD" : bus == 7 ? "USB" : "Disco";
+                    var rpm = Convert.ToUInt64(o["SpindleSpeed"] ?? 0UL);
+                    // Muitos discos (USB, RAID, modelos antigos) vêm com o tipo "desconhecido" (0).
+                    // A rotação resolve: HD gira (5400/7200 rpm); SSD informa 0. uint.MaxValue = "não sei".
+                    var hdd = media == 3 || (media == 0 && rpm is > 0 and < uint.MaxValue);
+                    var ssd = bus == 17 || media == 4 || (media == 0 && rpm == 0 && bus is not 7);
+                    var usb = bus == 7;
+                    var type = bus == 17 ? "SSD NVMe"
+                        : hdd ? (usb ? "HD USB" : "HD")
+                        : ssd ? (usb ? "SSD USB" : "SSD SATA")
+                        : usb ? "Disco USB" : "Disco";
                     disks.Add(new DiskHealth
                     {
                         Index = Convert.ToInt32(o["DeviceId"] ?? -1),
                         Model = o["FriendlyName"]?.ToString()?.Trim() ?? "Disco",
                         Type = type,
+                        IsHdd = hdd,
+                        IsNvme = bus == 17,
+                        IsUsb = usb,
+                        Rpm = hdd && rpm is > 0 and < uint.MaxValue ? (int)rpm : null,
                         Size = Convert.ToUInt64(o["Size"] ?? 0),
                         Serial = o["SerialNumber"]?.ToString()?.Trim() ?? "",
                         Firmware = o["FirmwareVersion"]?.ToString()?.Trim() ?? "",
@@ -89,7 +106,7 @@ public static class StorageService
         {
             try
             {
-                if (disk.Type == "SSD NVMe" && SmartReader.ReadNvme(disk.Index) is { } nvme) ReadNvme(nvme, disk);
+                if (disk.IsNvme && SmartReader.ReadNvme(disk.Index) is { } nvme) ReadNvme(nvme, disk);
                 else if (SmartReader.ReadAta(disk.Index) is { Count: > 0 } ata) ReadAta(ata, disk);
                 if (SmartReader.PredictsFailure(disk.Index) == true) disk.CriticalWarning = "o SMART prevê falha do disco";
 
@@ -242,7 +259,9 @@ public static class StorageService
         if (d.LifeUsedPercent >= 100) Crit("Vida útil do SSD esgotada (100% usada).");
         else if (d.LifeUsedPercent >= 80) Warn($"SSD com {d.LifeUsedPercent}% da vida útil usada.");
         if (d.CrcErrors > 0) Warn($"{d.CrcErrors} erro(s) de comunicação: troque o cabo SATA ou mude de porta.");
-        if (d.Temperature >= 70) Warn($"Temperatura alta ({d.Temperature} °C). Melhore a ventilação ou use dissipador no NVMe.");
+        // HD (partes mecânicas) sofre bem antes do SSD: acima de ~50 °C a vida útil cai.
+        if (d.IsHdd && d.Temperature >= 50) Warn($"HD quente ({d.Temperature} °C, o ideal é até 45 °C). Melhore a ventilação do gabinete na frente do HD.");
+        else if (!d.IsHdd && d.Temperature >= 70) Warn($"Temperatura alta ({d.Temperature} °C). Melhore a ventilação ou use dissipador no NVMe.");
         if (d.WindowsHealth == "Atenção") Warn("O Windows indica atenção na saúde do disco.");
         if (d.UnsafeShutdowns > 100) d.Issues.Add($"{d.UnsafeShutdowns} desligamentos sem aviso (quedas de energia, travamentos). Não é defeito, mas aumenta o risco de corromper arquivos.");
         if (!d.SmartAvailable) d.Issues.Add("Dados SMART indisponíveis (abra o SoNexus como administrador ou o disco é USB).");

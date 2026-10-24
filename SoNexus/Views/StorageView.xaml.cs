@@ -78,7 +78,7 @@ public partial class StorageView : UserControl
     private async Task ScanAsync(bool full)
     {
         if (DiskList.SelectedItem is not DiskHealth d) return;
-        if (full && d.Type == "HD" && MessageBox.Show(
+        if (full && d.IsHdd && MessageBox.Show(
                 $"A varredura completa de um HD de {Format.Bytes(d.Size)} pode levar algumas horas. O PC pode ser usado durante, mas fica mais lento. Continuar?",
                 "SoNexus", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
 
@@ -96,7 +96,7 @@ public partial class StorageView : UserControl
         });
         try
         {
-            var bad = await Task.Run(() => StorageService.Scan(d.Index, d.Size, full, d.Type == "HD", progress, _scan.Token));
+            var bad = await Task.Run(() => StorageService.Scan(d.Index, d.Size, full, d.IsHdd, progress, _scan.Token));
             var unreadable = bad.Count(b => b.Kind == "Ilegível");
             var slow = bad.Count - unreadable;
             ScanStatus.Text = (_scan.IsCancellationRequested ? "Parado. " : "Concluído. ") + (unreadable, slow) switch

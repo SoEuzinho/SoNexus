@@ -233,6 +233,7 @@ public partial class MainWindow : Window
                     ("Sensores", () => new SensorsView()),
                     ("Memória", () => new MemoryView()),
                     ("Armazenamento", () => new StorageView()),
+                    ("Teste de discos", () => new DiskCheckView()),
                     ("Energia", () => new EnergyView())),
                 nameof(NavOptim) => new SectionView(
                     ("Debloat do Windows", () => new DebloatView()),

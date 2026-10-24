@@ -1,0 +1,87 @@
+<UserControl x:Class="SoNexus.Views.DiskCheckView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Loaded="OnLoaded">
+    <DockPanel>
+        <Grid DockPanel.Dock="Top" Margin="0,0,14,16">
+            <StackPanel Margin="0,0,330,0">
+                <TextBlock Text="Teste geral de discos" Style="{StaticResource H1}"/>
+                <TextBlock Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,0" TextWrapping="Wrap"
+                           Text="Testa todos os SSDs, NVMe, HDs e discos USB de uma vez: saúde (SMART), setores defeituosos (só leitura, nada é apagado) e velocidade real. No fim, diz se cada disco está bom, pede atenção ou está ruim."/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                <Button x:Name="CopyButton" Content="Copiar relatório" Margin="0,0,8,0" Click="Copy_Click" IsEnabled="False"/>
+                <Button x:Name="StartButton" Content="Testar todos os discos" Style="{StaticResource PrimaryButton}" Click="Start_Click"/>
+                <Button x:Name="StopButton" Content="Parar" Visibility="Collapsed" Click="Stop_Click"/>
+            </StackPanel>
+        </Grid>
+
+        <Border DockPanel.Dock="Top" Style="{StaticResource Card}" Margin="0,0,14,14" Padding="18,12">
+            <StackPanel>
+                <CheckBox x:Name="SpeedBox" Content="Medir a velocidade (grava e lê 1 GB temporário em cada disco; o arquivo é apagado no fim)" IsChecked="True"/>
+                <TextBlock x:Name="Overall" Style="{StaticResource Muted}" Margin="0,8,0,0" TextWrapping="Wrap"
+                           Text="Leva de 1 a 3 minutos por disco. Feche jogos e cópias de arquivo grandes para o resultado ficar fiel."/>
+                <ProgressBar x:Name="OverallBar" Style="{StaticResource Meter}" Maximum="100" Margin="0,10,0,0" Visibility="Collapsed"/>
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <ItemsControl x:Name="ResultList" Margin="0,0,14,0">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border x:Name="card" Style="{StaticResource Card}" Margin="0,0,0,12">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="300"/>
+                                    <ColumnDefinition/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Margin="0,0,20,0">
+                                    <TextBlock Text="{Binding Title}" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                    <TextBlock Text="{Binding Subtitle}" Style="{StaticResource Muted}" Margin="0,2,0,10" TextWrapping="Wrap"/>
+                                    <Border x:Name="badge" HorizontalAlignment="Left" CornerRadius="12" Padding="12,4" BorderThickness="1" BorderBrush="{StaticResource MutedBrush}">
+                                        <TextBlock x:Name="badgeText" Text="{Binding Status}" Foreground="{StaticResource MutedBrush}" FontWeight="SemiBold"/>
+                                    </Border>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock x:Name="verdict" Text="{Binding VerdictText}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                    <TextBlock Text="{Binding Summary}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,2,0,8"/>
+                                    <ItemsControl ItemsSource="{Binding Problems}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding StringFormat='!  {0}'}" TextWrapping="Wrap" Margin="0,2"/>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <ItemsControl ItemsSource="{Binding Good}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding StringFormat='✔  {0}'}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,2"/>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                        <DataTemplate.Triggers>
+                            <DataTrigger Binding="{Binding Verdict}" Value="Ruim">
+                                <Setter TargetName="card" Property="BorderBrush" Value="{StaticResource DangerBrush}"/>
+                                <Setter TargetName="verdict" Property="Foreground" Value="{StaticResource DangerBrush}"/>
+                                <Setter TargetName="badge" Property="BorderBrush" Value="{StaticResource DangerBrush}"/>
+                                <Setter TargetName="badgeText" Property="Foreground" Value="{StaticResource DangerBrush}"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Verdict}" Value="Atenção">
+                                <Setter TargetName="verdict" Property="Foreground" Value="{StaticResource WarnBrush}"/>
+                                <Setter TargetName="badge" Property="BorderBrush" Value="{StaticResource WarnBrush}"/>
+                                <Setter TargetName="badgeText" Property="Foreground" Value="{StaticResource WarnBrush}"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Verdict}" Value="Bom">
+                                <Setter TargetName="badge" Property="BorderBrush" Value="{StaticResource OkBrush}"/>
+                                <Setter TargetName="badgeText" Property="Foreground" Value="{StaticResource OkBrush}"/>
+                            </DataTrigger>
+                        </DataTemplate.Triggers>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>
