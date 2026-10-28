@@ -17,6 +17,16 @@ public sealed class RgbSettings
     public List<string> Excluded { get; set; } = new();
     public List<int> Favorites { get; set; } = new();
     public bool RestoreOnStart { get; set; } = true;
+    /// <summary>Fitas de LED Bluetooth lembradas (ex.: BJ_LED).</summary>
+    public List<BleLedInfo> BleDevices { get; set; } = new();
+}
+
+public sealed class BleLedInfo
+{
+    public ulong Address { get; set; }
+    public string Name { get; set; } = "";
+    /// <summary>Recebe os efeitos do SoNexus.</summary>
+    public bool Enabled { get; set; } = true;
 }
 
 /// <summary>Preferências do usuário guardadas em %LocalAppData%\SoNexus\settings.json.</summary>

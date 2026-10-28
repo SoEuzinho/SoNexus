@@ -18,6 +18,17 @@ public sealed class RgbDeviceItem : ObservableObject
                             (Device.Mode.Length > 0 ? $" · modo {Device.Mode}" : "");
 }
 
+/// <summary>Linha da lista de fitas Bluetooth.</summary>
+public sealed class BleItem : ObservableObject
+{
+    private string _status = "";
+    public required BleLedInfo Info { get; init; }
+    public string Name => Info.Name;
+    public bool Enabled { get => Info.Enabled; set { Info.Enabled = value; Raise(nameof(Enabled)); } }
+    public string Status { get => _status; private set => Set(ref _status, value); }
+    public void Refresh() => Status = Info.Enabled ? BleLedService.Instance.StatusOf(Info.Address) : "Fora dos efeitos";
+}
+
 public partial class RgbView : UserControl
 {
     private readonly RgbService _rgb = RgbService.Instance;
@@ -90,6 +101,7 @@ public partial class RgbView : UserControl
             : vendorRunning > 0
                 ? "Com programas de RGB do fabricante abertos, os LEDs podem piscar ou voltar sozinhos: eles disputam o controle com o OpenRGB."
                 : "";
+        ShowBle();
         if (_rgb.Connected) ShowDevices();
         else await ConnectAsync();
     }
@@ -99,7 +111,7 @@ public partial class RgbView : UserControl
     private void OnServiceChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(() =>
     {
         Status.Text = _rgb.Status;
-        if (!_rgb.Connected) ControlsPanel.IsEnabled = HwCard.IsEnabled = false;
+        if (!_rgb.Connected) { HwCard.IsEnabled = false; ControlsPanel.IsEnabled = _rgb.HasBle; }
     });
 
     // ---------- Conexão e dispositivos ----------
@@ -115,6 +127,7 @@ public partial class RgbView : UserControl
         {
             Status.Text = "OpenRGB não encontrado. Siga os passos ao lado e clique em Conectar.";
             HowTo.Visibility = Visibility.Visible;
+            ControlsPanel.IsEnabled = _rgb.HasBle; // fitas Bluetooth funcionam sem o OpenRGB
         }
         ConnectButton.IsEnabled = true;
     }
@@ -131,7 +144,8 @@ public partial class RgbView : UserControl
                       (devices.Any(d => d.EmptyZones > 0) ? " · saídas ARGB com 0 LEDs serão configuradas sozinhas" : "") +
                       (_rgb.HardwareModeActive ? " · usando um modo da própria placa" : "");
         HowTo.Visibility = Visibility.Collapsed;
-        ControlsPanel.IsEnabled = HwCard.IsEnabled = devices.Count > 0;
+        HwCard.IsEnabled = devices.Count > 0;
+        ControlsPanel.IsEnabled = devices.Count > 0 || _rgb.HasBle;
     }
 
     private void DeviceToggle_Click(object sender, RoutedEventArgs e)
@@ -146,12 +160,67 @@ public partial class RgbView : UserControl
 
     private async void ApplyAsync()
     {
-        if (!_rgb.Connected) return;
+        if (!_rgb.Connected && !_rgb.HasBle) return;
         _applying = true;
         try { await Task.Run(_rgb.Apply); }
         catch (Exception ex) { Status.Text = $"Erro ao aplicar: {ex.Message}. Clique em Conectar."; return; }
         finally { _applying = false; }
-        ShowDevices();
+        if (_rgb.Connected) ShowDevices();
+        ShowBle();
+    }
+
+    // ---------- Fitas Bluetooth ----------
+
+    private readonly DispatcherTimer _bleTimer = new() { Interval = TimeSpan.FromSeconds(2) };
+    private List<BleItem> _ble = new();
+
+    private void ShowBle()
+    {
+        _ble = S.BleDevices.Select(b => new BleItem { Info = b }).ToList();
+        foreach (var b in _ble) b.Refresh();
+        BleList.ItemsSource = _ble;
+        if (_ble.Count > 0 && !_bleTimer.IsEnabled)
+        {
+            // Status (Conectada / Sem conexão) muda sozinho: atualiza enquanto a tela está visível.
+            _bleTimer.Tick += (_, _) => { if (IsVisible) foreach (var b in _ble) b.Refresh(); };
+            _bleTimer.Start();
+        }
+    }
+
+    private async void BleScan_Click(object sender, RoutedEventArgs e)
+    {
+        BleScanButton.IsEnabled = false;
+        BleStatus.Text = "Procurando fitas Bluetooth (10 s)... Deixe a fita ligada e o app do celular fechado.";
+        var (found, error) = await BleLedService.ScanAsync(10);
+        BleScanButton.IsEnabled = true;
+        if (error != null) { BleStatus.Text = error; return; }
+        var added = 0;
+        foreach (var f in found.Where(f => S.BleDevices.All(b => b.Address != f.Address)))
+        {
+            S.BleDevices.Add(new BleLedInfo { Address = f.Address, Name = $"{f.Name} ({f.AddressText[^5..]})" });
+            added++;
+        }
+        AppSettings.Current.Save();
+        BleStatus.Text = found.Count == 0
+            ? "Nenhuma fita encontrada. Confira se ela está ligada, perto do PC (até ~10 m) e desconectada do celular."
+            : added > 0 ? $"✔ {added} fita(s) adicionada(s). Elas seguem o efeito escolhido acima." : "As fitas encontradas já estavam na lista.";
+        ShowBle();
+        ApplyAsync();
+    }
+
+    private void BleToggle_Click(object sender, RoutedEventArgs e)
+    {
+        AppSettings.Current.Save();
+        ApplyAsync();
+    }
+
+    private void BleForget_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: BleItem item }) return;
+        S.BleDevices.Remove(item.Info);
+        BleLedService.Instance.Forget(item.Info.Address);
+        AppSettings.Current.Save();
+        ShowBle();
     }
 
     // ---------- Efeitos ----------

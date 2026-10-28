@@ -56,7 +56,10 @@ public sealed class RgbService : IDisposable
     /// <summary>Um modo da própria placa está ativo: o motor deixa os LEDs com ela.</summary>
     public bool HardwareModeActive { get; private set; }
     /// <summary>O motor de efeitos já está mandando cores (mudanças de cor/brilho valem na hora).</summary>
-    public bool Running => _running && _targets.Count > 0 && !HardwareModeActive;
+    public bool Running => _running && (_targets.Count > 0 || HasBle) && !HardwareModeActive;
+
+    /// <summary>Há fitas Bluetooth ligadas aos efeitos (funcionam mesmo sem o OpenRGB).</summary>
+    public bool HasBle => Settings.BleDevices.Any(b => b.Enabled);
 
     // ---------- Conexão ----------
 
@@ -97,6 +100,7 @@ public sealed class RgbService : IDisposable
         if (!Settings.RestoreOnStart) return;
         Task.Run(async () =>
         {
+            if (HasBle) Apply(); // fitas Bluetooth não dependem do OpenRGB
             for (var attempt = 0; attempt < 30 && !Connected; attempt++)
             {
                 if (await ConnectAsync()) break;
@@ -111,11 +115,12 @@ public sealed class RgbService : IDisposable
     /// <summary>Liga o efeito escolhido nas configurações (cor, velocidade, brilho, dispositivos).</summary>
     public void Apply()
     {
-        if (!Connected) return;
+        if (!Connected && !HasBle) return;
         HardwareModeActive = false;
+        _bleOff.Clear(); // efeito novo: manda o liga/desliga de novo
         lock (_io)
         {
-            var wanted = Devices.Where(d => !Settings.Excluded.Contains(d.Name)).ToList();
+            var wanted = Connected ? Devices.Where(d => !Settings.Excluded.Contains(d.Name)).ToList() : new List<RgbDevice>();
             // Prepara só quem mudou (preparar = ajustar zonas ARGB + modo Direto + reler o aparelho).
             var ready = new List<Target>();
             foreach (var d in wanted)
@@ -171,6 +176,13 @@ public sealed class RgbService : IDisposable
                     Changed?.Invoke(this, EventArgs.Empty);
                 }
             }
+            // Fitas Bluetooth: independentes do OpenRGB (um erro numa não derruba a outra).
+            // (Modo da própria placa vale só para a placa: as fitas seguem os efeitos.)
+            if (HasBle)
+            {
+                try { BleFrame(frameStart); }
+                catch (Exception ex) { AppLog.Write($"RGB Bluetooth: {ex.Message}"); }
+            }
             Thread.Sleep(FrameDelayMs());
         }
     }
@@ -181,7 +193,7 @@ public sealed class RgbService : IDisposable
     /// </summary>
     private int FrameDelayMs()
     {
-        if (!Connected || HardwareModeActive || _targets.Count == 0) return 1000;
+        if (!HasBle && (HardwareModeActive || !Connected || _targets.Count == 0)) return 1000;
         var animated = Enum.TryParse<RgbEffect>(Settings.Effect, out var e) && e is RgbEffect.Breathing or RgbEffect.Flash or RgbEffect.Rainbow
             or RgbEffect.Wave or RgbEffect.Gradient or RgbEffect.Music;
         return !animated ? 500 : BatterySaver ? 66 : 33;
@@ -224,6 +236,27 @@ public sealed class RgbService : IDisposable
                 target.Last = colors;
                 target.LastSent = now;
             }
+        }
+    }
+
+    private readonly HashSet<ulong> _bleOff = new();
+
+    /// <summary>Fitas Bluetooth: uma cor só para a fita inteira (o protocolo BJ_LED não tem cor por LED).</summary>
+    private void BleFrame(double t)
+    {
+        var s = Settings;
+        var effect = Enum.TryParse<RgbEffect>(s.Effect, out var e) ? e : RgbEffect.Static;
+        foreach (var dev in s.BleDevices.Where(b => b.Enabled).ToList())
+        {
+            if (effect == RgbEffect.Off)
+            {
+                // "Desligar LEDs": desliga de verdade (cor preta deixaria a fita ligada, gastando).
+                if (!_bleOff.Contains(dev.Address) && BleLedService.Instance.SetPower(dev.Address, false)) _bleOff.Add(dev.Address);
+                continue;
+            }
+            _bleOff.Remove(dev.Address);
+            var c = ColorAt(effect, t, Math.Clamp(s.Speed, 0.1, 5), 0, 1, Rgb.From(s.Color), Rgb.From(s.Color2)) * (Math.Clamp(s.Brightness, 0, 100) / 100);
+            BleLedService.Instance.SetColor(dev.Address, (byte)Math.Clamp(c.R, 0, 255), (byte)Math.Clamp(c.G, 0, 255), (byte)Math.Clamp(c.B, 0, 255));
         }
     }
 
@@ -323,6 +356,7 @@ public sealed class RgbService : IDisposable
         _running = false;
         _music?.Stop();
         lock (_io) _client?.Dispose();
+        BleLedService.Instance.Dispose();
     }
 }
 

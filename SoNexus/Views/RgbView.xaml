@@ -214,6 +214,37 @@
 
             <!-- Dispositivos e modos da própria placa -->
             <DockPanel Grid.Column="1" Margin="0,0,14,0">
+                <!-- Fitas Bluetooth (BJ_LED): funcionam sem o OpenRGB. -->
+                <Border DockPanel.Dock="Bottom" Style="{StaticResource Card}" Margin="0,12,0,0">
+                    <StackPanel>
+                        <Grid>
+                            <TextBlock Text="FITAS DE LED BLUETOOTH" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center"/>
+                            <Button x:Name="BleScanButton" Content="Procurar fitas" HorizontalAlignment="Right" Click="BleScan_Click"/>
+                        </Grid>
+                        <TextBlock x:Name="BleStatus" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,6"
+                                   Text="Fitas BJ_LED (app MohuanLED). Ligue a fita, feche o app no celular (ela aceita uma conexão por vez) e clique em Procurar."/>
+                        <ItemsControl x:Name="BleList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="30"/>
+                                            <ColumnDefinition/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <CheckBox IsChecked="{Binding Enabled, Mode=TwoWay}" VerticalAlignment="Top" Click="BleToggle_Click"/>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                                            <TextBlock Text="{Binding Status}" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                        <Button Grid.Column="2" Content="Esquecer" Padding="10,3" VerticalAlignment="Top" Tag="{Binding}" Click="BleForget_Click"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
                 <Border DockPanel.Dock="Bottom" x:Name="HwCard" Style="{StaticResource Card}" Margin="0,12,0,0" IsEnabled="False">
                     <StackPanel>
                         <TextBlock Text="MODOS DA PRÓPRIA PLACA" Style="{StaticResource Label}"/>
