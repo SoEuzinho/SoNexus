@@ -21,6 +21,20 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        // Auxiliar do Bluetooth (aberto pelo próprio SoNexus, sem administrador): sem janela nem trava de cópia única.
+        if (e.Args.Length == 3 && e.Args[0] == BleHelper.Arg)
+        {
+            Exiting = true;
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            new Thread(() =>
+            {
+                try { BleHelper.Run(e.Args[1], e.Args[2]); }
+                catch (Exception ex) { AppLog.Write($"Auxiliar Bluetooth: {ex.Message}"); }
+                Dispatcher.BeginInvoke(() => Shutdown());
+            }) { IsBackground = true }.Start();
+            return;
+        }
+
         // SONEXUS_INSTANCE: só para testes automáticos (rodar uma segunda cópia separada).
         var name = InstanceName + Environment.GetEnvironmentVariable("SONEXUS_INSTANCE");
         bool first;

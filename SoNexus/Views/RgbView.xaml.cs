@@ -26,7 +26,7 @@ public sealed class BleItem : ObservableObject
     public string Name => Info.Name;
     public bool Enabled { get => Info.Enabled; set { Info.Enabled = value; Raise(nameof(Enabled)); } }
     public string Status { get => _status; private set => Set(ref _status, value); }
-    public void Refresh() => Status = Info.Enabled ? BleLedService.Instance.StatusOf(Info.Address) : "Fora dos efeitos";
+    public void Refresh() => Status = Info.Enabled ? BleLeds.Current.StatusOf(Info.Address) : "Fora dos efeitos";
 }
 
 public partial class RgbView : UserControl
@@ -191,7 +191,7 @@ public partial class RgbView : UserControl
     {
         BleScanButton.IsEnabled = false;
         BleStatus.Text = "Procurando fitas Bluetooth (10 s)... Deixe a fita ligada e o app do celular fechado.";
-        var (found, error) = await BleLedService.ScanAsync(10);
+        var (found, error) = await BleLeds.Current.ScanAsync(10);
         BleScanButton.IsEnabled = true;
         if (error != null) { BleStatus.Text = error; return; }
         var added = 0;
@@ -218,7 +218,7 @@ public partial class RgbView : UserControl
     {
         if (sender is not Button { Tag: BleItem item }) return;
         S.BleDevices.Remove(item.Info);
-        BleLedService.Instance.Forget(item.Info.Address);
+        BleLeds.Current.Forget(item.Info.Address);
         AppSettings.Current.Save();
         ShowBle();
     }

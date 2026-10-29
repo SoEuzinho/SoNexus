@@ -16,7 +16,26 @@ public sealed record BleLedFound(ulong Address, string Name, short Rssi)
 ///   ligar/desligar: 69 96 02 01 01|00     cor: 69 96 05 02 RR GG BB
 /// Cada fita aceita uma conexão por vez: com o app do celular conectado, o PC não consegue controlar.
 /// </summary>
-public sealed class BleLedService : IDisposable
+/// <summary>O que as telas e o motor de efeitos usam para falar com as fitas (direto ou pelo processo auxiliar).</summary>
+public interface IBleLeds : IDisposable
+{
+    Task<(List<BleLedFound> Found, string? Error)> ScanAsync(int seconds = 10);
+    bool SetPower(ulong address, bool on);
+    void SetColor(ulong address, byte r, byte g, byte b);
+    string StatusOf(ulong address);
+    void Forget(ulong address);
+}
+
+public static class BleLeds
+{
+    /// <summary>
+    /// Como administrador o Windows nega o canal de comando das fitas (AccessDenied) e ainda deixa a conexão presa.
+    /// Então, com o SoNexus elevado, o Bluetooth roda num processo auxiliar sem administrador.
+    /// </summary>
+    public static IBleLeds Current { get; } = SensorDriver.IsAdmin ? BleHelperClient.Instance : BleLedService.Instance;
+}
+
+public sealed class BleLedService : IBleLeds
 {
     public static BleLedService Instance { get; } = new();
 
@@ -38,7 +57,7 @@ public sealed class BleLedService : IDisposable
     private readonly object _lock = new();
 
     /// <summary>Procura fitas por alguns segundos. Erro em português quando não há Bluetooth.</summary>
-    public static async Task<(List<BleLedFound> Found, string? Error)> ScanAsync(int seconds = 10)
+    public async Task<(List<BleLedFound> Found, string? Error)> ScanAsync(int seconds = 10)
     {
         var found = new Dictionary<ulong, BleLedFound>();
         BluetoothLEAdvertisementWatcher watcher;
@@ -123,6 +142,8 @@ public sealed class BleLedService : IDisposable
             var services = link.Device.GetGattServicesForUuidAsync(ServiceId, BluetoothCacheMode.Uncached).AsTask().Wait3s();
             var service = services?.Services.FirstOrDefault() ?? throw new InvalidOperationException("fita ocupada (feche o app MohuanLED no celular) ou modelo diferente");
             var chars = service.GetCharacteristicsForUuidAsync(CommandId, BluetoothCacheMode.Uncached).AsTask().Wait3s();
+            if (chars?.Status == GattCommunicationStatus.AccessDenied)
+                throw new InvalidOperationException("o Windows negou o acesso (outro programa está usando a fita)");
             link.Command = chars?.Characteristics.FirstOrDefault() ?? throw new InvalidOperationException("modelo sem o canal de comando esperado");
             link.Status = "Conectada";
             link.LastPower = null;

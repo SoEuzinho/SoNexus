@@ -251,12 +251,12 @@ public sealed class RgbService : IDisposable
             if (effect == RgbEffect.Off)
             {
                 // "Desligar LEDs": desliga de verdade (cor preta deixaria a fita ligada, gastando).
-                if (!_bleOff.Contains(dev.Address) && BleLedService.Instance.SetPower(dev.Address, false)) _bleOff.Add(dev.Address);
+                if (!_bleOff.Contains(dev.Address) && BleLeds.Current.SetPower(dev.Address, false)) _bleOff.Add(dev.Address);
                 continue;
             }
             _bleOff.Remove(dev.Address);
             var c = ColorAt(effect, t, Math.Clamp(s.Speed, 0.1, 5), 0, 1, Rgb.From(s.Color), Rgb.From(s.Color2)) * (Math.Clamp(s.Brightness, 0, 100) / 100);
-            BleLedService.Instance.SetColor(dev.Address, (byte)Math.Clamp(c.R, 0, 255), (byte)Math.Clamp(c.G, 0, 255), (byte)Math.Clamp(c.B, 0, 255));
+            BleLeds.Current.SetColor(dev.Address, (byte)Math.Clamp(c.R, 0, 255), (byte)Math.Clamp(c.G, 0, 255), (byte)Math.Clamp(c.B, 0, 255));
         }
     }
 
@@ -356,7 +356,7 @@ public sealed class RgbService : IDisposable
         _running = false;
         _music?.Stop();
         lock (_io) _client?.Dispose();
-        BleLedService.Instance.Dispose();
+        BleLeds.Current.Dispose();
     }
 }
 
