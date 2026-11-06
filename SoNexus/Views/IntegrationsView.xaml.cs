@@ -52,9 +52,9 @@ public partial class IntegrationsView : UserControl
 
         // Sensores
         cards.Add(SensorDriver.IsInstalled && SensorDriver.IsAdmin
-            ? new("", "Sensores do processador", "Driver PawnIO ativo: temperatura, consumo e tensões da CPU e da placa-mãe.", "Ativo", true, "Ver sensores", "NavHardware", "Sensores")
+            ? new("", "Sensores do processador", "Driver PawnIO ativo: temperatura, consumo e tensões da CPU e da placa-mãe.", "Ativo", true, "Ver sensores", "NavHardware", "Todos os sensores")
             : new("", "Sensores do processador", SensorDriver.IsAdmin ? "Falta o driver PawnIO (assinado) para ler a temperatura da CPU. Instale pela tela Início." : "Abra o SoNexus como administrador para ler todos os sensores.",
-                "Incompleto", false, "Ver sensores", "NavHardware", "Sensores"));
+                "Incompleto", false, "Ver sensores", "NavHardware", "Todos os sensores"));
 
         // Placa de vídeo
         var gpus = Safe(DriverService.GetGpuDrivers) ?? new();

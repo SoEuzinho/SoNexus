@@ -47,7 +47,7 @@ public sealed class TrayIcon : IDisposable
         var go = new ToolStripMenuItem("Ir para");
         foreach (var (label, nav, tab) in new (string, string, string?)[]
                  {
-                     ("Início", "NavHome", null), ("Sensores", "NavHardware", "Sensores"), ("FPS ao vivo", "NavGames", "FPS ao vivo"),
+                     ("Início", "NavHome", null), ("Sensores", "NavHardware", "Todos os sensores"), ("FPS ao vivo", "NavGames", "FPS ao vivo"),
                      ("Overclock e ventoinhas", "NavGames", "Overclock"), ("Iluminação RGB", "NavIntegration", "Iluminação RGB"),
                      ("Rotas de jogos", "NavNetwork", "Rotas e servidores de jogos"), ("Configurações", "NavSettings", null),
                  })

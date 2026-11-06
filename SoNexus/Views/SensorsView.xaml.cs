@@ -17,6 +17,15 @@ public partial class SensorsView : UserControl
     // Mín/máx próprios, para o botão "Zerar" funcionar sem mexer na biblioteca.
     private readonly Dictionary<string, (float Min, float Max)> _range = new();
 
+    // Só os sensores de uma peça (aba "Sensores" dentro de Processador, Placa de vídeo...). Nulo = todos.
+    private readonly Func<LibreHardwareMonitor.Hardware.HardwareType, bool>? _only;
+
+    public SensorsView(string title, Func<LibreHardwareMonitor.Hardware.HardwareType, bool> only) : this()
+    {
+        _only = only;
+        TitleText.Text = title;
+    }
+
     public SensorsView()
     {
         InitializeComponent();
@@ -43,6 +52,7 @@ public partial class SensorsView : UserControl
     private void Refresh()
     {
         var readings = HardwareService.Instance.Readings;
+        if (_only != null) readings = readings.Where(r => _only(r.HardwareType)).ToList();
         foreach (var s in readings)
         {
             if (!_byId.TryGetValue(s.Id, out var row))
@@ -65,7 +75,9 @@ public partial class SensorsView : UserControl
         var devices = readings.Select(r => r.Hardware).Distinct().Count();
         Status.Text = HardwareService.Instance.Error is { } err
             ? $"Erro: {err}"
-            : $"{readings.Count} sensores em {devices} dispositivos · atualiza a cada 1 s";
+            : readings.Count == 0 && _only != null
+                ? "Nenhum sensor desta peça disponível. Alguns só aparecem com o SoNexus como administrador e o driver PawnIO instalado."
+                : $"{readings.Count} sensores em {devices} dispositivos · atualiza a cada 1 s";
     }
 
     private bool Matches(object o)

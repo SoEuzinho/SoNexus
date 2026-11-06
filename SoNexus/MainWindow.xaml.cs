@@ -228,13 +228,8 @@ public partial class MainWindow : Window
         {
             view = name switch
             {
-                nameof(NavHardware) => new SectionView(
-                    ("Minhas peças", () => new HardwareView()),
-                    ("Sensores", () => new SensorsView()),
-                    ("Memória", () => new MemoryView()),
-                    ("Armazenamento", () => new StorageView()),
-                    ("Teste de discos", () => new DiskCheckView()),
-                    ("Energia", () => new EnergyView())),
+                // Por peça: cada uma com Info · Sensores · testes · Dicas (ver Views/PartViews.cs).
+                nameof(NavHardware) => HardwareParts.Section(),
                 nameof(NavOptim) => new SectionView(
                     ("Debloat do Windows", () => new DebloatView()),
                     ("Inicialização", () => new StartupView()),
@@ -248,9 +243,6 @@ public partial class MainWindow : Window
                     ("Seu PC e gargalo", () => new GameAnalysisView()),
                     ("FPS ao vivo", () => new FpsView()),
                     ("Overclock", () => new OverclockView()),
-                    ("Benchmark CPU", () => new BenchmarkView()),
-                    ("Benchmark GPU e memória", () => new HardwareBenchView()),
-                    ("Stress test", () => new StressView()),
                     ("Realidade virtual", () => new VrView())),
                 nameof(NavNetwork) => new SectionView(
                     ("Visão geral", () => new NetworkView()),
@@ -264,7 +256,6 @@ public partial class MainWindow : Window
                     ("Drivers e programas", () => new AudioDriversView())),
                 nameof(NavDiag) => new SectionView(
                     ("Erros e telas azuis", () => new DiagnosticsView()),
-                    ("Teste de RAM", () => new RamTestView()),
                     ("Latência (DPC)", () => new LatencyView())),
                 nameof(NavIntegration) => new SectionView(
                     ("Visão geral", () => new IntegrationsView()),
