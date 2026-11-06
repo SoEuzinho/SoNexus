@@ -10,7 +10,23 @@ public partial class GameAnalysisView : UserControl
     private PcProfile? _pc;
     private bool _loaded;
 
-    public GameAnalysisView() => InitializeComponent();
+    public GameAnalysisView()
+    {
+        InitializeComponent();
+        // Partidas novas aparecem ao voltar para esta aba.
+        IsVisibleChanged += (_, _) => { if (IsVisible) ShowMeasured(); };
+    }
+
+    private async void ShowMeasured()
+    {
+        var sessions = await Task.Run(SessionHistory.Load);
+        MeasuredList.ItemsSource = sessions.Take(8).ToList();
+        if (sessions.Count == 0) return;
+        // Resumo: o limite que mais apareceu nas partidas medidas.
+        var top = sessions.GroupBy(s => s.Main).OrderByDescending(g => g.Count()).First();
+        MeasuredStatus.Text = $"{sessions.Count} partida(s) medida(s). Na maioria, o limite foi: {top.Key.ToLowerInvariant()}." +
+                              (top.Key == GameDiagnosis.Name(FrameLimit.Cpu) ? " Isso é gargalo de processador de verdade, medido no seu PC." : "");
+    }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {

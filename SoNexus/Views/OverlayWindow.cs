@@ -33,24 +33,44 @@ public sealed class OverlayWindow : Window
         Left = 12;
         Top = 12;
         SizeChanged += (_, _) => Place();
-        Content = new Border
+        Content = _box = new Border
         {
-            Background = new SolidColorBrush(Color.FromArgb(0xB0, 0x00, 0x00, 0x00)),
             CornerRadius = new CornerRadius(6),
             Padding = new Thickness(10, 6, 10, 6),
             Child = _text,
         };
     }
 
+    private readonly Border _box;
     private int _corner;
+    private bool _oneLine;
 
-    /// <summary>Canto da tela (0-3) e tamanho da letra (0-2).</summary>
-    public void SetLayout(int corner, int size)
+    /// <summary>Canto da tela (0-3), tamanho da letra (0-2), fundo (0-100%) e se fica tudo numa linha.</summary>
+    public void SetLayout(int corner, int size, int opacity, bool oneLine)
     {
         _corner = corner;
-        _text.FontSize = size switch { 0 => 12, 2 => 20, _ => 15 };
+        _oneLine = oneLine;
+        ApplyLook(_box, _text, size, opacity);
         Place();
     }
+
+    /// <summary>Mesmo visual no painel do jogo e na prévia da tela de configuração.</summary>
+    public static void ApplyLook(Border box, TextBlock text, int size, int opacity)
+    {
+        text.FontSize = size switch { 0 => 12, 2 => 20, _ => 15 };
+        // Sem fundo, uma sombra deixa os números legíveis em cena clara.
+        box.Background = new SolidColorBrush(Color.FromArgb((byte)(Math.Clamp(opacity, 0, 100) * 2.55), 0, 0, 0));
+        text.Effect = opacity < 30 ? new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 3, ShadowDepth = 1, Opacity = 1 } : null;
+    }
+
+    /// <summary>Cor dos números escolhida nas configurações.</summary>
+    public static Brush ValueBrush(int color) => color switch
+    {
+        1 => Brushes.LightGreen,
+        2 => Brushes.Gold,
+        3 => Brushes.Cyan,
+        _ => Brushes.White,
+    };
 
     /// <summary>Encosta no canto escolhido da tela principal (onde o jogo roda em tela cheia).</summary>
     private void Place()
@@ -64,18 +84,24 @@ public sealed class OverlayWindow : Window
 
     public void SetLines(IEnumerable<(string Label, string Value, Brush Color)> lines)
     {
-        _text.Inlines.Clear();
-        var first = true;
-        foreach (var (label, value, color) in lines)
-        {
-            if (!first) _text.Inlines.Add(new System.Windows.Documents.LineBreak());
-            first = false;
-            _text.Inlines.Add(new System.Windows.Documents.Run($"{label,-5} ") { Foreground = Brushes.Gray });
-            _text.Inlines.Add(new System.Windows.Documents.Run(value) { Foreground = color });
-        }
+        Render(_text, lines, _oneLine);
         // Alguns jogos tomam o "sempre por cima": reafirma a cada atualização.
         Topmost = false;
         Topmost = true;
+    }
+
+    public static void Render(TextBlock text, IEnumerable<(string Label, string Value, Brush Color)> lines, bool oneLine)
+    {
+        text.Inlines.Clear();
+        var first = true;
+        foreach (var (label, value, color) in lines)
+        {
+            if (!first) text.Inlines.Add(oneLine ? new System.Windows.Documents.Run("   ") : new System.Windows.Documents.LineBreak());
+            first = false;
+            if (label.Length > 0)
+                text.Inlines.Add(new System.Windows.Documents.Run(oneLine ? label + " " : $"{label,-5} ") { Foreground = Brushes.Gray });
+            text.Inlines.Add(new System.Windows.Documents.Run(value) { Foreground = color });
+        }
     }
 
     protected override void OnSourceInitialized(EventArgs e)

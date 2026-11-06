@@ -15,6 +15,8 @@ public partial class FpsView : UserControl
     private int? _pinnedPid;
     private int? _currentPid;
     private bool _updatingList;
+    private GameSession? _session;
+    private int _refreshHz;
 
     public FpsView()
     {
@@ -22,6 +24,12 @@ public partial class FpsView : UserControl
         FrameChart.Stroke = Metric.Warn;
         _timer.Tick += (_, _) => Refresh();
         BuildOverlayOptions();
+        // Prévia do painel: atualiza só com a página aberta (ou com medição/painel ligados).
+        IsVisibleChanged += (_, _) =>
+        {
+            if (IsVisible) { Refresh(); _timer.Start(); }
+            else if (_monitor == null && _overlay == null) _timer.Stop();
+        };
     }
 
     private void Start_Click(object sender, RoutedEventArgs e)
@@ -48,7 +56,8 @@ public partial class FpsView : UserControl
 
     private void Stop_Click(object sender, RoutedEventArgs e)
     {
-        _timer.Stop();
+        EndSession();
+        if (!IsVisible) _timer.Stop();
         _monitor?.Dispose();
         _monitor = null;
         StartButton.Visibility = Visibility.Visible;
@@ -87,7 +96,7 @@ public partial class FpsView : UserControl
         {
             _overlay ??= new OverlayWindow();
             _overlay.Show();
-            _overlay.SetLayout(AppSettings.Current.OverlayCorner, AppSettings.Current.OverlaySize);
+            ApplyOverlayLook();
             UpdateOverlay(Sample(null), null);
             _timer.Start();
         }
@@ -108,7 +117,8 @@ public partial class FpsView : UserControl
         if (_monitor == null)
         {
             // Painel aberto sem medição: continua mostrando os sensores.
-            if (_overlay != null) UpdateOverlay(Sample(null), null);
+            UpdateOverlay(Sample(null), null);
+            if (!IsVisible && _overlay == null) _timer.Stop();
             return;
         }
         var active = _monitor.Active();
@@ -121,7 +131,9 @@ public partial class FpsView : UserControl
         var game = _pinnedPid is { } pinned ? active.FirstOrDefault(p => p.Pid == pinned) : _monitor.PickGame(active);
         if (game != null && game.Pid != _currentPid)
         {
+            EndSession();
             _currentPid = game.Pid;
+            _session = new GameSession(game.Name);
             FpsChart.Clear();
             FrameChart.Clear();
         }
@@ -160,10 +172,16 @@ public partial class FpsView : UserControl
             Low1Text.Foreground = stats.Low1 >= stats.AvgFps * 0.6 ? Metric.Ok : Metric.Warn;
         }
 
-        var (title, detail) = Diagnose(game.Fps, stats, s.CpuLoad, s.CoreMax, s.CpuTemp, s.GpuLoad, s.GpuTemp,
+        if (_refreshHz == 0) _refreshHz = GamesService.PrimaryRefreshHz();
+        var second = new GameSecond(game.Fps, s.CpuLoad, s.CoreMax, s.CpuTemp, s.GpuLoad, s.GpuTemp,
             s.VramUsedMb is { } u && s.VramTotalMb is { } t && t > 0 ? u / t * 100 : null, s.RamPct);
+        var limit = GameDiagnosis.Classify(second, _refreshHz);
+        var (title, detail) = GameDiagnosis.Explain(limit, second, _refreshHz);
         DiagnosisTitle.Text = title;
-        DiagnosisText.Text = detail;
+        DiagnosisText.Text = detail + (stats == null ? "" : $" Fluidez: {stats.Smoothness.ToLowerInvariant()} (1% low {stats.Low1:0} de média {stats.AvgFps:0}" +
+                                                         (stats.Stutters > 0 ? $", {stats.Stutters} engasgo(s) na sessão" : "") + ").");
+        _session?.Add(second, limit);
+        ShowSession();
         BottleneckText.Text = s.CoreMax > 0 ? $"núcleo mais ocupado: {s.CoreMax:0}%" : "";
 
         UpdateOverlay(s, (game, stats));
@@ -230,45 +248,104 @@ public partial class FpsView : UserControl
         }
         CornerBox.SelectedIndex = Math.Clamp(AppSettings.Current.OverlayCorner, 0, 3);
         SizeBox.SelectedIndex = Math.Clamp(AppSettings.Current.OverlaySize, 0, 2);
+        ColorBox.SelectedIndex = Math.Clamp(AppSettings.Current.OverlayColor, 0, 3);
+        FlowBox.SelectedIndex = Math.Clamp(AppSettings.Current.OverlayFlow, 0, 1);
+        OpacitySlider.Value = Math.Clamp(AppSettings.Current.OverlayOpacity, 0, 100);
+        ApplyOverlayLook();
     }
 
     private void OverlayLayout_Changed(object sender, SelectionChangedEventArgs e)
     {
-        if (CornerBox == null || SizeBox == null || CornerBox.SelectedIndex < 0 || SizeBox.SelectedIndex < 0) return;
-        AppSettings.Current.OverlayCorner = CornerBox.SelectedIndex;
-        AppSettings.Current.OverlaySize = SizeBox.SelectedIndex;
-        AppSettings.Current.Save();
-        _overlay?.SetLayout(CornerBox.SelectedIndex, SizeBox.SelectedIndex);
+        if (CornerBox == null || SizeBox == null || ColorBox == null || FlowBox == null || PreviewText == null ||
+            CornerBox.SelectedIndex < 0 || SizeBox.SelectedIndex < 0 || ColorBox.SelectedIndex < 0 || FlowBox.SelectedIndex < 0) return;
+        var set = AppSettings.Current;
+        set.OverlayCorner = CornerBox.SelectedIndex;
+        set.OverlaySize = SizeBox.SelectedIndex;
+        set.OverlayColor = ColorBox.SelectedIndex;
+        set.OverlayFlow = FlowBox.SelectedIndex;
+        set.Save();
+        ApplyOverlayLook();
+        UpdateOverlay(Sample(null), null);
     }
 
-    private static int? _refreshHz;
-
-    /// <summary>Diz em português quem está segurando o FPS agora, a partir dos sensores.</summary>
-    private static (string Title, string Detail) Diagnose(double fps, FpsStats? stats, float? cpuLoad, float coreMax, float? cpuTemp,
-        float? gpuLoad, float? gpuTemp, double? vramPct, uint ramPct)
+    private void Opacity_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        _refreshHz ??= GamesService.PrimaryRefreshHz();
-        var smooth = stats == null ? "" : $" Fluidez: {stats.Smoothness.ToLowerInvariant()} (1% low {stats.Low1:0} de média {stats.AvgFps:0}" +
-                                         (stats.Stutters > 0 ? $", {stats.Stutters} engasgo(s) na sessão" : "") + ").";
-        var caps = new[] { 30, 60, 75, 90, 100, 120, 144, 165, 170, 180, 200, 240, 360, _refreshHz.Value };
-        var cap = caps.FirstOrDefault(c => Math.Abs(fps - c) <= Math.Max(1.5, c * 0.02));
+        if (OpacityText == null || PreviewText == null) return;
+        AppSettings.Current.OverlayOpacity = (int)OpacitySlider.Value;
+        OpacityText.Text = $"{OpacitySlider.Value:0}%";
+        AppSettings.Current.Save();
+        ApplyOverlayLook();
+    }
 
-        if (gpuTemp >= 87 || cpuTemp >= 95)
-            return ("Esquentando demais", $"{(gpuTemp >= 87 ? $"Placa a {gpuTemp:0} °C" : $"Processador a {cpuTemp:0} °C")}: acima disso as peças baixam o clock sozinhas (thermal throttling) e o FPS cai. Limpe a poeira, melhore o fluxo de ar ou deixe as ventoinhas mais fortes." + smooth);
-        if (vramPct >= 95)
-            return ("Memória de vídeo cheia", $"A VRAM está em {vramPct:0}%. Quando enche, a placa usa a RAM do PC e aparecem engasgos. Baixe a qualidade das texturas." + smooth);
-        if (ramPct >= 90)
-            return ("RAM do PC quase cheia", $"{ramPct}% da memória em uso: o Windows começa a usar o disco e o jogo engasga. Feche navegador e programas em segundo plano." + smooth);
-        if (gpuLoad >= 95)
-            return ("Limite: placa de vídeo", "A placa está trabalhando a 99%, o cenário normal em jogos pesados. Para mais FPS: baixe sombras, reflexos e efeitos, ou ative DLSS/FSR/XeSS." + smooth);
-        if (cap > 0 && gpuLoad is < 90)
-            return ($"FPS travado em {cap}", (cap == _refreshHz ? "É a taxa do monitor: V-Sync, G-Sync/FreeSync ou o limitador do jogo estão segurando. Isso é bom para fluidez." :
-                                              "Há um limitador de FPS ativo (no jogo, no painel da NVIDIA/AMD ou no RivaTuner). Tire-o se quiser mais FPS.") + smooth);
-        if (coreMax >= 90 && gpuLoad is < 90)
-            return ("Limite: processador", $"Um núcleo do processador está a {coreMax:0}% e a placa está só a {gpuLoad:0}%: o processador não consegue preparar quadros mais rápido. Suba a resolução/gráficos (é \"de graça\"), feche programas em segundo plano." + smooth);
-        if (gpuLoad is < 80)
-            return ("Nem placa nem processador no limite", $"Placa a {gpuLoad:0}% e núcleo mais ocupado a {coreMax:0}%. O motor do jogo, o servidor online, a leitura do disco ou um limitador estão segurando o FPS." + smooth);
-        return ("Equilibrado", $"Placa a {gpuLoad:0}% e processador a {cpuLoad:0}%: as duas peças estão bem aproveitadas." + smooth);
+    /// <summary>Aplica tamanho, fundo, canto e formato no painel do jogo e na prévia.</summary>
+    private void ApplyOverlayLook()
+    {
+        var set = AppSettings.Current;
+        OverlayWindow.ApplyLook(PreviewBox, PreviewText, set.OverlaySize, set.OverlayOpacity);
+        _overlay?.SetLayout(set.OverlayCorner, set.OverlaySize, set.OverlayOpacity, set.OverlayFlow == 1);
+    }
+
+    /// <summary>Fecha a partida atual e guarda no histórico (aba "Seu PC e gargalo").</summary>
+    private void EndSession()
+    {
+        if (_session == null) return;
+        var stats = _monitor != null && _currentPid is { } pid ? _monitor.SessionStats(pid) : null;
+        var session = _session;
+        _session = null;
+        Task.Run(() => SessionHistory.Save(session, stats));
+    }
+
+    private List<HealthTip>? _ramTips;
+
+    /// <summary>Veredito da partida e a barra de quanto tempo cada coisa segurou o FPS.</summary>
+    private void ShowSession()
+    {
+        if (_session == null) return;
+        if (_session.Seconds >= GameSession.MinSeconds && _ramTips == null)
+        {
+            _ramTips = new();
+            Task.Run(() => HardwareHealth.Check().Where(t => t.Part == HardwareHealth.Ram).ToList())
+                .ContinueWith(t => _ramTips = t.IsCompletedSuccessfully ? t.Result : new(), TaskScheduler.FromCurrentSynchronizationContext());
+        }
+        var (title, detail) = _session.Verdict(_ramTips);
+        SessionTitle.Text = title;
+        SessionText.Text = detail;
+        SessionBar.ColumnDefinitions.Clear();
+        SessionBar.Children.Clear();
+        SessionLegend.Children.Clear();
+        if (_session.Seconds < GameSession.MinSeconds) return;
+        var shares = _session.Shares();
+        for (var i = 0; i < shares.Count; i++)
+        {
+            var (l, share) = shares[i];
+            SessionBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(share, GridUnitType.Star) });
+            var brush = LimitBrush(i);
+            var part = new Border { Background = brush, Margin = new Thickness(0, 0, i < shares.Count - 1 ? 2 : 0, 0) };
+            Grid.SetColumn(part, i);
+            SessionBar.Children.Add(part);
+            var legend = new TextBlock { Margin = new Thickness(0, 0, 12, 0), FontSize = 11, Foreground = (Brush)FindResource("MutedBrush") };
+            legend.Inlines.Add(new System.Windows.Documents.Run("■ ") { Foreground = brush });
+            legend.Inlines.Add(new System.Windows.Documents.Run($"{GameDiagnosis.Name(l)} {share * 100:0}%"));
+            SessionLegend.Children.Add(legend);
+        }
+    }
+
+    private static readonly Brush[] RankBrushes =
+    {
+        Brushes.White,
+        Frozen(Color.FromRgb(0xA0, 0xA0, 0xA0)),
+        Frozen(Color.FromRgb(0x70, 0x70, 0x70)),
+        Frozen(Color.FromRgb(0x48, 0x48, 0x48)),
+    };
+
+    /// <summary>Tons de cinza (tema preto e branco): o maior pedaço é o mais claro.</summary>
+    private static Brush LimitBrush(int rank) => RankBrushes[Math.Min(rank, RankBrushes.Length - 1)];
+
+    private static Brush Frozen(Color c)
+    {
+        var b = new SolidColorBrush(c);
+        b.Freeze();
+        return b;
     }
 
     private void Copy_Click(object sender, RoutedEventArgs e)
@@ -278,7 +355,7 @@ public partial class FpsView : UserControl
                    $"Duração {s.Duration:hh\\:mm\\:ss} · {s.Frames:N0} quadros\n" +
                    $"FPS médio {s.AvgFps:0} · 1% low {s.Low1:0} · 0,1% low {s.Low01:0}\n" +
                    $"Engasgos {s.Stutters} · pior quadro {s.MaxFrameTime:0} ms · fluidez: {s.Smoothness}\n" +
-                   $"{CpuText.Text}\n{GpuText.Text}\nDiagnóstico: {DiagnosisTitle.Text}";
+                   $"{CpuText.Text}\n{GpuText.Text}\nAgora: {DiagnosisTitle.Text}\nNa partida: {SessionTitle.Text}";
         try { Clipboard.SetText(text); } catch { }
         DiagnosisText.Text = "Relatório copiado. Cole no Discord, WhatsApp ou num fórum.";
     }
@@ -286,9 +363,10 @@ public partial class FpsView : UserControl
     /// <summary>Monta as linhas do painel sobre o jogo só com o que o usuário marcou (e o que este PC tem).</summary>
     private void UpdateOverlay(Snapshot s, (FpsProcess Game, FpsStats? Stats)? play)
     {
-        if (_overlay == null) return;
+        if (_overlay == null && !IsVisible) return;
         var on = AppSettings.Current.OverlayItems.ToHashSet();
-        var accent = (Brush)FindResource("AccentBrush");
+        var value = OverlayWindow.ValueBrush(AppSettings.Current.OverlayColor);
+        var accent = value;
         var lines = new List<(string, string, Brush)>();
         static string Join(IEnumerable<string?> parts) => string.Join("  ", parts.Where(p => !string.IsNullOrEmpty(p)));
 
@@ -309,7 +387,7 @@ public partial class FpsView : UserControl
             on.Contains("cpupower") && s.CpuPower != null ? Fmt(s.CpuPower, "W") : null,
             on.Contains("core") && s.CoreMax > 0 ? $"núcleo {s.CoreMax:0}%" : null,
         });
-        if (cpu.Length > 0) lines.Add(("CPU", cpu, TempBrush(s.CpuTemp)));
+        if (cpu.Length > 0) lines.Add(("CPU", cpu, TempBrush(s.CpuTemp, value)));
 
         var gpu = Join(new[]
         {
@@ -318,24 +396,26 @@ public partial class FpsView : UserControl
             on.Contains("gpuclock") && s.GpuClock is { } g ? $"{g:0} MHz" : null,
             on.Contains("gpupower") && s.GpuPower != null ? Fmt(s.GpuPower, "W") : null,
         });
-        if (gpu.Length > 0) lines.Add(("GPU", gpu, TempBrush(s.GpuTemp)));
+        if (gpu.Length > 0) lines.Add(("GPU", gpu, TempBrush(s.GpuTemp, value)));
         if (on.Contains("vram") && s.VramUsedMb is { } vu)
             lines.Add(("VRAM", s.VramTotalMb is { } vt and > 0 ? $"{vu / 1024:0.0}/{vt / 1024:0} GB" : $"{vu / 1024:0.0} GB",
-                s.VramTotalMb is { } t2 and > 0 && vu / t2 > 0.95 ? Metric.Warn : Brushes.White));
+                s.VramTotalMb is { } t2 and > 0 && vu / t2 > 0.95 ? Metric.Danger : value));
 
         var ram = Join(new[]
         {
             on.Contains("ram") ? $"{s.RamUsedGb:0.0}/{s.RamTotalGb:0} GB" : null,
             on.Contains("gameram") && s.GameRamGb is { } gr ? $"jogo {gr:0.0} GB" : null,
         });
-        if (ram.Length > 0) lines.Add(("RAM", ram, s.RamPct >= 90 ? Metric.Warn : Brushes.White));
-        if (on.Contains("time")) lines.Add(("HORA", DateTime.Now.ToString("HH:mm"), Brushes.White));
+        if (ram.Length > 0) lines.Add(("RAM", ram, s.RamPct >= 90 ? Metric.Danger : value));
+        if (on.Contains("time")) lines.Add(("HORA", DateTime.Now.ToString("HH:mm"), value));
 
         if (lines.Count == 0) lines.Add(("", "Nada marcado em \"Mostrar sobre o jogo\"", Brushes.Gray));
-        _overlay.SetLines(lines);
+        _overlay?.SetLines(lines);
+        OverlayWindow.Render(PreviewText, lines, AppSettings.Current.OverlayFlow == 1);
     }
 
-    private static Brush TempBrush(float? t) => t switch { null or < 75 => Brushes.White, < 85 => Metric.Warn, _ => Metric.Danger };
+    /// <summary>Quente demais fica vermelho (perigo de verdade); o resto na cor escolhida.</summary>
+    private static Brush TempBrush(float? t, Brush normal) => t is >= 85 ? Metric.Danger : normal;
 
     private static string Fmt(float? v, string unit) => v is { } x ? $"{x:0}{(unit == "%" ? "%" : " " + unit)}" : "—";
 }

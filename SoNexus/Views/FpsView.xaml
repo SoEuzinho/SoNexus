@@ -24,7 +24,13 @@
             <StackPanel>
                 <TextBlock Text="Mostrar sobre o jogo" Style="{StaticResource H2}"/>
                 <TextBlock Style="{StaticResource Muted}" Margin="0,2,0,8" TextWrapping="Wrap"
-                           Text="O que aparece na tela durante o jogo (jogo em janela sem borda)."/>
+                           Text="Aparece por cima do jogo em janela sem borda (Ctrl+Shift+F liga e desliga). Em tela cheia exclusiva o Windows não deixa."/>
+                <!-- Prévia: o mesmo painel, com os números de agora -->
+                <Border Background="#FF1E2633" CornerRadius="6" Padding="8" Margin="0,0,0,10" MinHeight="60">
+                    <Border x:Name="PreviewBox" HorizontalAlignment="Left" VerticalAlignment="Top" CornerRadius="6" Padding="10,6">
+                        <TextBlock x:Name="PreviewText" FontFamily="Consolas" FontWeight="SemiBold"/>
+                    </Border>
+                </Border>
                 <UniformGrid x:Name="OverlayItemsPanel" Columns="2"/>
                 <Grid Margin="0,8,0,0">
                     <Grid.ColumnDefinitions>
@@ -43,7 +49,27 @@
                         <ComboBoxItem Content="Médio"/>
                         <ComboBoxItem Content="Grande"/>
                     </ComboBox>
+                    <ComboBox x:Name="ColorBox" Grid.Row="1" Margin="0,8,0,0" SelectionChanged="OverlayLayout_Changed" ToolTip="Cor dos números">
+                        <ComboBoxItem Content="Branco"/>
+                        <ComboBoxItem Content="Verde"/>
+                        <ComboBoxItem Content="Amarelo"/>
+                        <ComboBoxItem Content="Ciano"/>
+                    </ComboBox>
+                    <ComboBox x:Name="FlowBox" Grid.Row="1" Grid.Column="2" Margin="0,8,0,0" SelectionChanged="OverlayLayout_Changed">
+                        <ComboBoxItem Content="Em coluna"/>
+                        <ComboBoxItem Content="Em uma linha"/>
+                    </ComboBox>
+                    <Grid.RowDefinitions>
+                        <RowDefinition/>
+                        <RowDefinition/>
+                    </Grid.RowDefinitions>
                 </Grid>
+                <DockPanel Margin="0,10,0,0">
+                    <TextBlock Text="Fundo" Style="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <TextBlock x:Name="OpacityText" DockPanel.Dock="Right" Style="{StaticResource Muted}" Width="36" TextAlignment="Right" VerticalAlignment="Center"/>
+                    <Slider x:Name="OpacitySlider" Minimum="0" Maximum="100" SmallChange="5" LargeChange="10" IsSnapToTickEnabled="True" TickFrequency="5"
+                            VerticalAlignment="Center" ValueChanged="Opacity_Changed" ToolTip="0% = só os números, sem fundo"/>
+                </DockPanel>
             </StackPanel>
         </Border>
 
@@ -139,6 +165,16 @@
                     <TextBlock Text="DIAGNÓSTICO AO VIVO" Foreground="{StaticResource AccentBrush}" FontSize="11" FontWeight="Bold"/>
                     <TextBlock x:Name="DiagnosisTitle" Text="Inicie a medição e jogue por alguns segundos." FontSize="16" FontWeight="SemiBold" Margin="0,4,0,2" TextWrapping="Wrap"/>
                     <TextBlock x:Name="DiagnosisText" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+                    <!-- Partida inteira, medida segundo a segundo -->
+                    <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Margin="0,10,0,0" Padding="0,10,0,0">
+                        <StackPanel>
+                            <TextBlock Text="NESTA PARTIDA (MEDIDO)" Foreground="{StaticResource AccentBrush}" FontSize="11" FontWeight="Bold"/>
+                            <TextBlock x:Name="SessionTitle" Text="Abra um jogo com a medição ligada." FontSize="14" FontWeight="SemiBold" Margin="0,4,0,2" TextWrapping="Wrap"/>
+                            <TextBlock x:Name="SessionText" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+                            <Grid x:Name="SessionBar" Height="8" Margin="0,8,0,4" ToolTip="Quanto tempo cada coisa segurou o FPS"/>
+                            <WrapPanel x:Name="SessionLegend"/>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
             </Border>
             <Border Grid.Column="1" Style="{StaticResource Card}" Margin="0,0,14,14">

@@ -110,6 +110,15 @@ public sealed class AppSettings
     /// <summary>0 = pequeno, 1 = médio, 2 = grande.</summary>
     public int OverlaySize { get; set; } = 1;
 
+    /// <summary>Cor dos números (0 = branco, 1 = verde, 2 = amarelo, 3 = ciano).</summary>
+    public int OverlayColor { get; set; }
+
+    /// <summary>0 = uma linha por peça, 1 = tudo numa linha só.</summary>
+    public int OverlayFlow { get; set; }
+
+    /// <summary>Fundo do painel, 0 a 100% (0 = só os números).</summary>
+    public int OverlayOpacity { get; set; } = 70;
+
     private static readonly string FilePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SoNexus", "settings.json");
 

@@ -42,9 +42,43 @@
                 </Border>
             </UniformGrid>
 
+            <!-- Medido de verdade: vem das partidas gravadas em FPS ao vivo -->
             <Border Style="{StaticResource Card}" Margin="0,0,12,12">
                 <StackPanel>
-                    <TextBlock Text="GARGALO POR RESOLUÇÃO" Style="{StaticResource Label}" Margin="0,0,0,6"/>
+                    <TextBlock Text="GARGALO MEDIDO NAS SUAS PARTIDAS" Style="{StaticResource Label}" Margin="0,0,0,6"/>
+                    <TextBlock x:Name="MeasuredStatus" Style="{StaticResource Muted}" TextWrapping="Wrap"
+                               Text="Nenhuma partida medida ainda. Abra Jogos › FPS ao vivo, clique em Iniciar medição e jogue pelo menos 30 segundos: o SoNexus anota, segundo a segundo, se quem segurou o FPS foi a placa, o processador, a temperatura ou um limitador."/>
+                    <ItemsControl x:Name="MeasuredList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="220"/>
+                                        <ColumnDefinition Width="150"/>
+                                        <ColumnDefinition/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Game}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding When}" FontSize="11" Foreground="{StaticResource MutedBrush}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="LIMITE" Style="{StaticResource Label}"/>
+                                        <TextBlock FontWeight="SemiBold"><Run Text="{Binding Main, Mode=OneWay}"/><Run Text=" "/><Run Text="{Binding MainPct, Mode=OneWay, StringFormat={}{0:0}%}" Foreground="{StaticResource MutedBrush}"/></TextBlock>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="{Binding Title}" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding Summary}" FontSize="11" Foreground="{StaticResource MutedBrush}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Margin="0,0,12,12">
+                <StackPanel>
+                    <TextBlock Text="GARGALO ESTIMADO POR RESOLUÇÃO" Style="{StaticResource Label}" Margin="0,0,0,6"/>
                     <TextBlock Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,12"
                                Text="Gargalo é a peça que segura as outras. A cada quadro, o processador prepara a cena (física, IA, comandos) e a placa de vídeo desenha. O FPS final é o da peça mais lenta: se o processador só prepara 80 quadros, uma placa capaz de 150 fica parada metade do tempo. Em resoluções maiores a placa trabalha mais e o processador pesa menos."/>
                     <ItemsControl x:Name="BottleneckList">
@@ -74,7 +108,7 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                     <TextBlock Style="{StaticResource Muted}" Margin="0,8,0,0" TextWrapping="Wrap"
-                               Text="Estimativa pelo desempenho médio de cada peça em reviews. Para medir o gargalo real num jogo, abra Jogos › FPS ao vivo durante a partida: ele mostra o uso da placa e do processador e diz quem está segurando."/>
+                               Text="Estimativa pelo desempenho médio de cada peça em reviews, para um jogo pesado. Cada jogo é diferente: o que vale é a medição das suas partidas, logo acima."/>
                 </StackPanel>
             </Border>
 
