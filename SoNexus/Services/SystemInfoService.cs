@@ -7,17 +7,39 @@ namespace SoNexus.Services;
 /// <summary>Coleta as peças do PC via WMI e registro.</summary>
 public static class SystemInfoService
 {
-    public static List<InfoSection> Collect() => new()
+    private static readonly (string Title, string Glyph, Func<List<InfoItem>> Build)[] Builders =
     {
-        Section("Sistema", "", SystemItems),
-        Section("Processador", "", CpuItems),
-        Section("Placa-mãe e BIOS", "", BoardItems),
-        Section("Memória RAM", "", RamItems),
-        Section("Placa de vídeo", "", GpuItems),
-        Section("Armazenamento", "", StorageItems),
-        Section("Rede", "", NetworkItems),
-        Section("Áudio", "", AudioItems),
+        ("Sistema", "", SystemItems),
+        ("Processador", "", CpuItems),
+        ("Placa-mãe e BIOS", "", BoardItems),
+        ("Memória RAM", "", RamItems),
+        ("Placa de vídeo", "", GpuItems),
+        ("Armazenamento", "", StorageItems),
+        ("Rede", "", NetworkItems),
+        ("Áudio", "", AudioItems),
     };
+
+    public static List<InfoSection> Collect() => Builders.Select(b => Section(b.Title, b.Glyph, b.Build)).ToList();
+
+    /// <summary>Só uma seção (usado na aba "Info" de cada peça, para não ler o PC inteiro).</summary>
+    public static InfoSection CollectOne(string title)
+    {
+        var b = Builders.First(x => x.Title == title);
+        return Section(b.Title, b.Glyph, b.Build);
+    }
+
+    // Placas "de mentira" criadas por apps (VR, streaming, tela remota): não são a sua placa de vídeo.
+    private static readonly string[] VirtualAdapterNames =
+    {
+        "Virtual Desktop", "Virtual Display", "Virtual Monitor", "Parsec", "Microsoft Basic Display", "Microsoft Remote Display",
+        "IddSample", "Indirect Display", "spacedesk", "Meta Virtual", "Oculus Virtual", "Citrix", "Duet Display",
+        "Sunshine", "Moonlight", "GameViewer", "Splashtop", "AnyDesk", "TeamViewer", "Mirage Driver", "DisplayLink",
+    };
+
+    /// <summary>Adaptador de vídeo virtual (Virtual Desktop, Parsec, tela remota...). PNP "ROOT\..." = criado por software.</summary>
+    public static bool IsVirtualAdapter(string name, string? pnpId = null) =>
+        VirtualAdapterNames.Any(v => name.Contains(v, StringComparison.OrdinalIgnoreCase))
+        || (pnpId?.StartsWith(@"ROOT\", StringComparison.OrdinalIgnoreCase) ?? false);
 
     public static string ToText(IEnumerable<InfoSection> sections)
     {
@@ -125,7 +147,10 @@ public static class SystemInfoService
     private static List<InfoItem> GpuItems()
     {
         var list = new List<InfoItem>();
-        foreach (var g in Query("SELECT * FROM Win32_VideoController"))
+        var all = Query("SELECT * FROM Win32_VideoController");
+        var real = all.Where(g => !IsVirtualAdapter(S(g, "Name"), S(g, "PNPDeviceID"))).ToList();
+        // Máquina virtual só tem adaptador virtual: aí mostra o que houver.
+        foreach (var g in real.Count > 0 ? real : all)
         {
             var name = S(g, "Name");
             var vram = GpuMemory(name) ?? U(g, "AdapterRAM");

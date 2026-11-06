@@ -477,7 +477,7 @@ public static partial class GamesService
 
     public static int PrimaryRefreshHz() => PrimaryDisplay().Hz;
 
-    private static (int W, int H, int Hz, int MaxHz) PrimaryDisplay()
+    public static (int W, int H, int Hz, int MaxHz) PrimaryDisplay()
     {
         var mode = new DEVMODE { dmSize = (short)System.Runtime.InteropServices.Marshal.SizeOf<DEVMODE>() };
         if (!EnumDisplaySettings(null, -1 /* ENUM_CURRENT_SETTINGS */, ref mode) || mode.dmPelsWidth <= 0) return (1920, 1080, 60, 60);

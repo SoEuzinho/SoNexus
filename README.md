@@ -4,13 +4,13 @@ Kit de ferramentas para PC Windows, por **SoStudio** — criado por **SoEuzinho*
 
 Tudo num app só, com interface minimalista preto e branco:
 
-- **Hardware**: peças, sensores (temperatura, consumo, tensões), memória (latência e banda), saúde dos discos (SMART + varredura de setores), energia e custo na conta de luz.
+- **Hardware por peça**: Processador, Placa de vídeo, Memória RAM, Armazenamento, Placa-mãe e Energia/fonte. Cada peça tem Info, Sensores, os testes dela (benchmark, stress test, teste de RAM, teste de discos) e Dicas. A Visão geral mostra a saúde do PC: RAM em canal único ou abaixo da velocidade (EXPO/XMP desligado), disco do sistema cheio, BIOS antiga, monitor abaixo da taxa máxima e fonte recomendada pelo consumo medido.
 - **Otimização**: debloat do Windows (ajustes reversíveis com backup, remoção de apps), inicialização estilo Autoruns, itens ocultos.
 - **Drivers**: instalar driver NVIDIA/AMD/Intel com um clique, drivers de todos os dispositivos, remoção limpa do driver de vídeo (estilo DDU).
-- **Jogos**: biblioteca de todos os launchers com FPS estimado, gargalo, FPS ao vivo com painel sobre o jogo, overclock e ventoinhas (com regras de segurança), benchmarks e stress test de CPU, GPU, VRAM, RAM e disco, realidade virtual.
+- **Jogos**: biblioteca de todos os launchers com FPS estimado, gargalo, FPS ao vivo com painel sobre o jogo, overclock e ventoinhas (com regras de segurança), realidade virtual.
 - **Rede**: visão geral, apps e conexões, rotas até servidores de jogos (estilo WinMTR), segurança, DNS.
 - **Áudio**: dispositivos, Voicemeeter, drivers.
-- **Diagnóstico**: telas azuis e erros, teste de RAM, latência DPC.
+- **Diagnóstico**: telas azuis e erros, latência DPC.
 - **Integração**: RGB via OpenRGB, iniciar com o Windows, segundo plano na bandeja.
 
 ## Instalar

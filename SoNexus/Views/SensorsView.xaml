@@ -5,7 +5,7 @@
     <DockPanel>
         <Grid DockPanel.Dock="Top" Margin="0,0,0,18">
             <StackPanel>
-                <TextBlock Text="Sensores" Style="{StaticResource H1}"/>
+                <TextBlock x:Name="TitleText" Text="Sensores" Style="{StaticResource H1}"/>
                 <TextBlock x:Name="Status" Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,0" Text="Aguardando leitura..."/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">

@@ -130,12 +130,14 @@ public static class DriverService
     public static List<GpuDriver> GetGpuDrivers()
     {
         var list = new List<GpuDriver>();
-        using var searcher = new ManagementObjectSearcher("SELECT Name, DriverVersion, DriverDate, AdapterCompatibility FROM Win32_VideoController");
+        using var searcher = new ManagementObjectSearcher("SELECT Name, DriverVersion, DriverDate, AdapterCompatibility, PNPDeviceID FROM Win32_VideoController");
         foreach (ManagementObject g in searcher.Get())
         {
             using (g)
             {
                 var name = g["Name"]?.ToString() ?? "";
+                // Placa virtual (Virtual Desktop, Parsec...) não tem driver de vídeo para baixar.
+                if (SystemInfoService.IsVirtualAdapter(name, g["PNPDeviceID"]?.ToString())) continue;
                 var compat = g["AdapterCompatibility"]?.ToString() ?? "";
                 var text = name + " " + compat;
                 var (vendor, url) =

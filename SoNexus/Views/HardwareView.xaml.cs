@@ -29,9 +29,24 @@ public partial class HardwareView : UserControl
     {
         RefreshButton.IsEnabled = CopyButton.IsEnabled = false;
         Status.Text = "Lendo informações do sistema...";
-        _sections = await Task.Run(SystemInfoService.Collect);
+        var sections = Task.Run(SystemInfoService.Collect);
+        var health = Task.Run(HardwareHealth.Check);
+        _sections = await sections;
         Sections.ItemsSource = _sections;
+        ShowHealth(await health);
         Status.Text = $"Atualizado às {DateTime.Now:HH:mm:ss}";
         RefreshButton.IsEnabled = CopyButton.IsEnabled = true;
+    }
+
+    private void ShowHealth(List<HealthTip> tips)
+    {
+        Health.Children.Clear();
+        var problems = tips.Where(t => t.IsProblem).ToList();
+        if (problems.Count == 0)
+            Health.Children.Add(UiParts.TipCard(new HealthTip("PC", HealthLevel.Ok, "Tudo certo com as peças",
+                "Não encontramos nada urgente. Veja as dicas de cada peça nas abas acima."), showPart: false));
+        foreach (var t in problems) Health.Children.Add(UiParts.TipCard(t, showPart: true));
+        var info = tips.Count(t => t.Level == HealthLevel.Info);
+        HealthHint.Text = info > 0 ? $"Mais {info} dica(s) na aba \"Dicas\" de cada peça." : "";
     }
 }

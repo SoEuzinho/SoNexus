@@ -5,7 +5,7 @@
     <DockPanel>
         <Grid DockPanel.Dock="Top" Margin="0,0,0,18">
             <StackPanel>
-                <TextBlock Text="Minhas peças" Style="{StaticResource H1}"/>
+                <TextBlock Text="Visão geral" Style="{StaticResource H1}"/>
                 <TextBlock x:Name="Status" Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,0"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
@@ -15,6 +15,12 @@
         </Grid>
 
         <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel>
+            <!-- Saúde do PC: o que precisa de atenção, antes dos detalhes -->
+            <TextBlock Text="SAÚDE DO PC" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,8"/>
+            <StackPanel x:Name="Health" Margin="0,0,14,6"/>
+            <TextBlock x:Name="HealthHint" Style="{StaticResource Muted}" FontSize="12.5" Margin="0,0,0,20" TextWrapping="Wrap"/>
+            <TextBlock Text="PEÇAS" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,8"/>
             <ItemsControl x:Name="Sections">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
@@ -49,6 +55,7 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+          </StackPanel>
         </ScrollViewer>
     </DockPanel>
 </UserControl>

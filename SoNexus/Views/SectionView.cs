@@ -13,14 +13,17 @@ public sealed class SectionView : UserControl
     private readonly UserControl?[] _cache;
     private readonly ContentControl _host = new();
 
-    public SectionView(params (string Title, Func<UserControl> Create)[] pages)
+    public SectionView(params (string Title, Func<UserControl> Create)[] pages) : this(false, pages) { }
+
+    /// <param name="secondary">Abas de segundo nível (dentro de uma peça do Hardware): pílulas menores.</param>
+    public SectionView(bool secondary, params (string Title, Func<UserControl> Create)[] pages)
     {
         _pages = pages;
         _cache = new UserControl?[pages.Length];
 
         // WrapPanel: em janelas estreitas as abas descem para a linha de baixo em vez de sumir.
-        var bar = new WrapPanel { Margin = new Thickness(0, 0, 0, 22) };
-        var style = (Style)Application.Current.FindResource("SubNav");
+        var bar = new WrapPanel { Margin = new Thickness(0, 0, 0, secondary ? 14 : 22) };
+        var style = (Style)Application.Current.FindResource(secondary ? "SubNavPill" : "SubNav");
         for (var i = 0; i < pages.Length; i++)
         {
             var index = i;
@@ -40,11 +43,23 @@ public sealed class SectionView : UserControl
         Content = dock;
 
         ((RadioButton)bar.Children[0]).IsChecked = true;
+
+        // Uma página compartilhada pode ter sido levada por outra seção: ao voltar, mostra de novo.
+        IsVisibleChanged += (_, _) => { if (IsVisible && _host.Content == null && _current >= 0) Show(_current); };
     }
+
+    private int _current = -1;
 
     private readonly List<RadioButton> _tabs = new();
 
-    private void Show(int index) => _host.Content = _cache[index] ??= _pages[index].Create();
+    private void Show(int index)
+    {
+        _current = index;
+        var page = _cache[index] ??= _pages[index].Create();
+        // Página compartilhada (ex.: Stress test em Processador e em Placa de vídeo): solta da aba anterior antes de mostrar aqui.
+        if (page.Parent is ContentControl old && !ReferenceEquals(old, _host)) old.Content = null;
+        _host.Content = page;
+    }
 
     /// <summary>A página de uma aba, criando se ainda não existe (sem trocar a aba aberta).</summary>
     public UserControl? Page(string title)
@@ -58,5 +73,20 @@ public sealed class SectionView : UserControl
     {
         var tab = _tabs.FirstOrDefault(t => (string)t.Content == title);
         if (tab != null) tab.IsChecked = true;
+    }
+}
+
+/// <summary>
+/// Telas que aparecem em mais de um lugar (ex.: Stress test em Processador e em Placa de vídeo).
+/// Uma instância só: o teste em andamento continua o mesmo, e não dá para rodar dois ao mesmo tempo.
+/// </summary>
+public static class SharedPages
+{
+    private static readonly Dictionary<Type, UserControl> Pages = new();
+
+    public static T Get<T>() where T : UserControl, new()
+    {
+        if (!Pages.TryGetValue(typeof(T), out var page)) Pages[typeof(T)] = page = new T();
+        return (T)page;
     }
 }
