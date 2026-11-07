@@ -112,6 +112,7 @@ public partial class App : Application
         });
         // Volta a iluminação escolhida da última vez (espera o OpenRGB abrir, se for o caso).
         RgbService.Instance.RestoreOnStartup();
+        if (AppSettings.Current.GameBoost && SensorDriver.IsAdmin) GameBoostService.Instance.Start();
     }
 
     /// <summary>Libera a "trava" de cópia única (para reabrir o app, ex.: depois de instalar o driver de sensores).</summary>
@@ -127,6 +128,7 @@ public partial class App : Application
         if (MainWindow is MainWindow main)
         {
             FanControlService.Instance.RestoreAll();
+            GameBoostService.Instance.Stop(); // devolve as prioridades originais
             HardwareService.Instance.Dispose();
             RgbService.Instance.Dispose();
             main.DisposeTray();

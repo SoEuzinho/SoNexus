@@ -318,6 +318,26 @@ public static class DebloatService
             Risk = Risk.Moderado,
             Actions = new TweakAction[] { new ServiceDisable("WSearch", "delayed-auto") },
         },
+        new()
+        {
+            Id = "network-throttling", Category = "Jogos e desempenho", Title = "Tirar o limite de rede para multimídia",
+            Description = "O Windows segura o tráfego de rede enquanto toca áudio/vídeo. Sem o limite, jogos online e downloads não perdem pacotes por isso.",
+            Restart = Restart.Windows,
+            Actions = new TweakAction[] { L(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile", "NetworkThrottlingIndex", unchecked((int)0xFFFFFFFF), 10) },
+        },
+        new()
+        {
+            Id = "menu-delay", Category = "Jogos e desempenho", Title = "Menus abrindo mais rápido",
+            Description = "Os menus do Windows esperam 0,4 s antes de abrir. Com o ajuste, abrem quase na hora.",
+            Restart = Restart.Windows,
+            Actions = new TweakAction[] { C(@"Control Panel\Desktop", "MenuShowDelay", "50", "400") },
+        },
+        new()
+        {
+            Id = "startup-delay", Category = "Jogos e desempenho", Title = "Programas da inicialização sem espera",
+            Description = "O Windows segura os programas da inicialização por alguns segundos depois do login. Sem a espera, tudo fica pronto antes.",
+            Actions = new TweakAction[] { C(@"Software\Microsoft\Windows\CurrentVersion\Explorer\Serialize", "StartupDelayInMSec", 0, null) },
+        },
 
         // ---------- Sistema ----------
         new()

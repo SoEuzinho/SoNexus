@@ -123,6 +123,10 @@ public sealed class AppSettings
     public int OverlayTheme { get; set; }
     public bool OverlayAnimate { get; set; } = true;
 
+    /// <summary>Prioridade alta para o jogo na frente e equilíbrio de programas em segundo plano (Ferramentas).</summary>
+    public bool GameBoost { get; set; }
+    public bool ProBalance { get; set; } = true;
+
     private static readonly string FilePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SoNexus", "settings.json");
 

@@ -96,9 +96,64 @@ public static class SystemInfoService
             list.Add(new("Cache L2 / L3", $"{U(c, "L2CacheSize") / 1024.0:0.#} MB / {U(c, "L3CacheSize") / 1024.0:0.#} MB"));
             list.Add(new("Soquete", S(c, "SocketDesignation")));
             list.Add(new("Virtualização", S(c, "VirtualizationFirmwareEnabled") == "True" ? "Ativada" : "Desativada"));
+            list.Add(new("Família / modelo", $"{S(c, "Caption").Replace("Family", "família").Replace("Model", "modelo").Replace("Stepping", "stepping")}"));
+            list.Add(new("Instruções", Instructions()));
+            list.Add(new("Caches", CacheText()));
         }
         return list;
     }
+
+    /// <summary>Conjuntos de instruções que o processador tem (o que o CPU-Z mostra em "Instructions").</summary>
+    private static string Instructions()
+    {
+        var x = new List<string>();
+        void Has(bool ok, string name) { if (ok) x.Add(name); }
+        Has(System.Runtime.Intrinsics.X86.Sse42.IsSupported, "SSE4.2");
+        Has(System.Runtime.Intrinsics.X86.Avx.IsSupported, "AVX");
+        Has(System.Runtime.Intrinsics.X86.Avx2.IsSupported, "AVX2");
+        Has(System.Runtime.Intrinsics.X86.Fma.IsSupported, "FMA3");
+        Has(System.Runtime.Intrinsics.X86.Avx512F.IsSupported, "AVX-512");
+        Has(System.Runtime.Intrinsics.X86.Aes.IsSupported, "AES");
+        Has(System.Runtime.Intrinsics.X86.Bmi2.IsSupported, "BMI2");
+        Has(System.Runtime.Intrinsics.X86.Popcnt.IsSupported, "POPCNT");
+        Has(System.Runtime.Intrinsics.X86.X86Base.X64.IsSupported, "x86-64");
+        return x.Count == 0 ? "—" : string.Join(", ", x);
+    }
+
+    /// <summary>Cache por nível, por núcleo e total (GetLogicalProcessorInformationEx).</summary>
+    private static string CacheText()
+    {
+        try
+        {
+            uint len = 0;
+            GetLogicalProcessorInformationEx(2 /* RelationCache */, IntPtr.Zero, ref len);
+            var buf = System.Runtime.InteropServices.Marshal.AllocHGlobal((int)len);
+            try
+            {
+                if (!GetLogicalProcessorInformationEx(2, buf, ref len)) return "—";
+                // Por nível/tipo: quantidade e tamanho de cada cache.
+                var caches = new Dictionary<string, (int Count, uint Size)>();
+                for (var off = 0; off < len;)
+                {
+                    var p = buf + off;
+                    var size = System.Runtime.InteropServices.Marshal.ReadInt32(p, 4);
+                    var level = System.Runtime.InteropServices.Marshal.ReadByte(p, 8);
+                    var bytes = (uint)System.Runtime.InteropServices.Marshal.ReadInt32(p, 12);
+                    var type = System.Runtime.InteropServices.Marshal.ReadInt32(p, 16); // 1 instrução, 2 dados
+                    var key = level == 1 ? (type == 1 ? "L1 instr." : "L1 dados") : $"L{level}";
+                    caches[key] = caches.TryGetValue(key, out var c) ? (c.Count + 1, bytes) : (1, bytes);
+                    off += size;
+                }
+                static string Kb(uint b) => b >= 1 << 20 ? $"{b >> 20} MB" : $"{b >> 10} KB";
+                return string.Join(" · ", caches.OrderBy(k => k.Key).Select(k => k.Value.Count > 1 ? $"{k.Key} {k.Value.Count}×{Kb(k.Value.Size)}" : $"{k.Key} {Kb(k.Value.Size)}"));
+            }
+            finally { System.Runtime.InteropServices.Marshal.FreeHGlobal(buf); }
+        }
+        catch { return "—"; }
+    }
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetLogicalProcessorInformationEx(int relation, IntPtr buffer, ref uint length);
 
     private static List<InfoItem> BoardItems()
     {

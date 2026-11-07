@@ -1,4 +1,4 @@
-﻿using System.Security.Principal;
+using System.Security.Principal;
 using System.Windows;
 using System.Windows.Controls;
 using SoNexus.Services;
@@ -251,6 +251,13 @@ public partial class MainWindow : Window
                     ("Stress test", () => SharedPages.Get<StressView>()),
                     ("Overclock", () => new OverclockView()),
                     ("EXPO, PBO e BIOS", () => new BiosGuideView())),
+                // Funções de programas avulsos (RAMMap, Process Lasso, Ninite, UFO Test) dentro do SoNexus.
+                nameof(NavTools) => new SectionView(
+                    ("Memória (RAM)", () => new RamToolView()),
+                    ("Prioridade dos jogos", () => new GameBoostView()),
+                    ("Limpeza", () => new CleanupView()),
+                    ("Instalar programas", () => new InstallAppsView()),
+                    ("Teste do monitor", () => new MonitorTestView())),
                 nameof(NavNetwork) => new SectionView(
                     ("Visão geral", () => new NetworkView()),
                     ("Aplicativos e conexões", () => new NetworkAppsView()),

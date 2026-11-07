@@ -1,4 +1,4 @@
-﻿<Window x:Class="SoNexus.MainWindow"
+<Window x:Class="SoNexus.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="SoNexus" Width="1320" Height="860" MinWidth="1060" MinHeight="660"
@@ -49,6 +49,7 @@
                     <RadioButton x:Name="NavDrivers" Style="{StaticResource NavButton}" GroupName="Nav" Tag="&#xE895;" Content="Drivers" Checked="Nav_Checked"/>
                     <RadioButton x:Name="NavGames" Style="{StaticResource NavButton}" GroupName="Nav" Tag="&#xE7FC;" Content="Jogos" Checked="Nav_Checked"/>
                     <RadioButton x:Name="NavPerf" Style="{StaticResource NavButton}" GroupName="Nav" Tag="&#xEC4A;" Content="Desempenho" Checked="Nav_Checked"/>
+                    <RadioButton x:Name="NavTools" Style="{StaticResource NavButton}" GroupName="Nav" Tag="&#xE90F;" Content="Ferramentas" Checked="Nav_Checked"/>
                     <RadioButton x:Name="NavNetwork" Style="{StaticResource NavButton}" GroupName="Nav" Tag="&#xE968;" Content="Rede" Checked="Nav_Checked"/>
                     <RadioButton x:Name="NavAudio" Style="{StaticResource NavButton}" GroupName="Nav" Tag="&#xE767;" Content="Áudio" Checked="Nav_Checked"/>
                     <RadioButton x:Name="NavDiag" Style="{StaticResource NavButton}" GroupName="Nav" Tag="&#xE9D9;" Content="Diagnóstico" Checked="Nav_Checked"/>
