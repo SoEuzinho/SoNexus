@@ -4,10 +4,13 @@
              xmlns:c="clr-namespace:SoNexus.Controls">
     <DockPanel>
         <Grid DockPanel.Dock="Top" Margin="0,0,0,16">
-            <StackPanel Margin="0,0,420,0">
+            <StackPanel Margin="0,0,560,0">
                 <TextBlock Text="Desempenho em jogos" Style="{StaticResource H1}"/>
                 <TextBlock Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,0" TextWrapping="Wrap"
-                           Text="Mede FPS, 1% low, engasgos e tempo de quadro de jogos DirectX 9/11/12, Vulkan e OpenGL, sem mexer no jogo (não ativa anti-cheat). Inicie a medição e abra o jogo."/>
+                           Text="Mede FPS, 1% low, engasgos e tempo de quadro de jogos DirectX 9/11/12, Vulkan e OpenGL, sem mexer no jogo. Inicie a medição e abra o jogo."/>
+                <TextBlock FontSize="13" Margin="0,4,0,0">
+                    <Hyperlink Click="AntiCheat_Click" Foreground="{StaticResource TextBrush}">Isso pode dar ban? Veja como funciona</Hyperlink>
+                </TextBlock>
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                 <CheckBox x:Name="OverlayBox" Content="Mostrar sobre o jogo" VerticalAlignment="Center" Margin="0,0,14,0" Click="Overlay_Click"/>
@@ -18,19 +21,35 @@
             </StackPanel>
         </Grid>
 
-        <DockPanel DockPanel.Dock="Right" Width="320" Margin="0,0,14,0">
+        <Grid DockPanel.Dock="Right" Width="320" Margin="0,0,14,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" MinHeight="120"/>
+            <RowDefinition Height="2.4*"/>
+        </Grid.RowDefinitions>
         <!-- O que aparece sobre o jogo -->
-        <Border DockPanel.Dock="Bottom" Style="{StaticResource Card}" Margin="0,14,0,0">
+        <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,14,0,0">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
             <StackPanel>
                 <TextBlock Text="Mostrar sobre o jogo" Style="{StaticResource H2}"/>
                 <TextBlock Style="{StaticResource Muted}" Margin="0,2,0,8" TextWrapping="Wrap"
                            Text="Aparece por cima do jogo em janela sem borda (Ctrl+Shift+F liga e desliga). Em tela cheia exclusiva o Windows não deixa."/>
                 <!-- Prévia: o mesmo painel, com os números de agora -->
-                <Border Background="#FF1E2633" CornerRadius="6" Padding="8" Margin="0,0,0,10" MinHeight="60">
-                    <Border x:Name="PreviewBox" HorizontalAlignment="Left" VerticalAlignment="Top" CornerRadius="6" Padding="10,6">
-                        <TextBlock x:Name="PreviewText" FontFamily="Consolas" FontWeight="SemiBold"/>
-                    </Border>
+                <Border CornerRadius="6" Padding="4" Margin="0,0,0,10" MinHeight="70" ClipToBounds="True">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#FF2B3A4F" Offset="0"/>
+                            <GradientStop Color="#FF1A2230" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+                    <ContentControl x:Name="PreviewHost" HorizontalAlignment="Left" VerticalAlignment="Top"/>
                 </Border>
+                <DockPanel Margin="0,0,0,8">
+                    <CheckBox x:Name="AnimateBox" DockPanel.Dock="Right" Content="Animar" VerticalAlignment="Center" Margin="10,0,0,0" Click="Animate_Click"
+                              ToolTip="Brilho e enfeites se mexendo devagar (15 quadros por segundo, quase nada de CPU)"/>
+                    <ComboBox x:Name="ThemeBox" SelectionChanged="OverlayLayout_Changed" ToolTip="Tema do painel"/>
+                </DockPanel>
+                <TextBlock Style="{StaticResource Muted}" FontSize="11" Margin="0,0,0,10" TextWrapping="Wrap"
+                           Text="Temas originais do SoNexus. Não usam marca, logo nem personagem de nenhum jogo ou empresa, e não têm ligação com eles."/>
                 <UniformGrid x:Name="OverlayItemsPanel" Columns="2"/>
                 <Grid Margin="0,8,0,0">
                     <Grid.ColumnDefinitions>
@@ -71,6 +90,7 @@
                             VerticalAlignment="Center" ValueChanged="Opacity_Changed" ToolTip="0% = só os números, sem fundo"/>
                 </DockPanel>
             </StackPanel>
+            </ScrollViewer>
         </Border>
 
         <!-- Processos -->
@@ -114,7 +134,7 @@
                 </ListBox>
             </DockPanel>
         </Border>
-        </DockPanel>
+        </Grid>
 
         <!-- Números -->
         <Grid DockPanel.Dock="Top">

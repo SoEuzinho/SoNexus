@@ -119,6 +119,10 @@ public sealed class AppSettings
     /// <summary>Fundo do painel, 0 a 100% (0 = só os números).</summary>
     public int OverlayOpacity { get; set; } = 70;
 
+    /// <summary>Tema do painel (índice de <c>OverlaySkin.Names</c>) e se os enfeites se mexem.</summary>
+    public int OverlayTheme { get; set; }
+    public bool OverlayAnimate { get; set; } = true;
+
     private static readonly string FilePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SoNexus", "settings.json");
 

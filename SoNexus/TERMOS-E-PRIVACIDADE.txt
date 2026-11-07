@@ -1,5 +1,5 @@
 ﻿SONEXUS — TERMOS DE USO E POLÍTICA DE PRIVACIDADE
-Versão 1 — outubro de 2026
+Versão 2 — novembro de 2026
 SoNexus é um software da SoStudio, criado por SoEuzinho.
 
 Leia com atenção. Ao instalar ou usar o SoNexus, você declara que leu, entendeu e aceita
@@ -45,6 +45,14 @@ e) Você é o único responsável pelas ações que decidir executar no seu comp
 
 f) As estimativas mostradas (FPS esperado, gargalo, saúde de discos, consumo de energia,
    custo na conta de luz etc.) são aproximações e não garantem resultados reais.
+
+g) Jogos online e anti-cheat: a medição de FPS lê eventos públicos do Windows (ETW) e o
+   painel sobre o jogo é uma janela separada; o SoNexus não lê nem altera a memória ou os
+   arquivos dos jogos e não dá vantagem a ninguém. Mesmo assim, cada jogo e cada sistema
+   anti-cheat tem regras próprias, que podem mudar sem aviso. O autor e a SoStudio não
+   garantem que nenhum jogo vá reclamar do SoNexus e não respondem por avisos, suspensões
+   ou banimentos de contas. Em jogos competitivos, se tiver dúvida, desligue a medição e
+   o painel.
 
 
 3. LIMITAÇÃO DE RESPONSABILIDADE
@@ -103,6 +111,9 @@ O SoNexus usa bibliotecas e componentes de terceiros, cada um com a sua licença
 instalado somente se você pedir, a partir do instalador oficial e assinado do autor dele.
 Marcas citadas (NVIDIA, AMD, Intel, Microsoft, Steam, Valve, ASUS, entre outras)
 pertencem aos seus donos; o SoNexus não é afiliado a elas.
+Os temas do painel sobre o jogo (Neon, Imperial, Pixel, Arena, Fofo etc.) são desenhos
+originais do SoNexus: não usam logos, nomes ou personagens de jogos ou empresas e não
+indicam parceria, patrocínio ou aprovação de ninguém.
 
 
 6. LICENÇA DO CÓDIGO

@@ -16,6 +16,9 @@ public partial class FpsView : UserControl
     private int? _currentPid;
     private bool _updatingList;
     private GameSession? _session;
+    private bool _building;
+    // Texto da prévia: o mesmo tipo de painel do jogo, montado pelo tema escolhido.
+    private readonly TextBlock PreviewText = OverlayWindow.NewText();
     private int _refreshHz;
 
     public FpsView()
@@ -27,6 +30,7 @@ public partial class FpsView : UserControl
         // Prévia do painel: atualiza só com a página aberta (ou com medição/painel ligados).
         IsVisibleChanged += (_, _) =>
         {
+            ApplyOverlayLook(); // liga/desliga a animação da prévia
             if (IsVisible) { Refresh(); _timer.Start(); }
             else if (_monitor == null && _overlay == null) _timer.Stop();
         };
@@ -97,7 +101,6 @@ public partial class FpsView : UserControl
             _overlay ??= new OverlayWindow();
             _overlay.Show();
             ApplyOverlayLook();
-            UpdateOverlay(Sample(null), null);
             _timer.Start();
         }
         else
@@ -234,6 +237,7 @@ public partial class FpsView : UserControl
 
     private void BuildOverlayOptions()
     {
+        _building = true;
         var chosen = AppSettings.Current.OverlayItems.ToHashSet();
         foreach (var (key, label) in OverlayItems)
         {
@@ -251,14 +255,20 @@ public partial class FpsView : UserControl
         ColorBox.SelectedIndex = Math.Clamp(AppSettings.Current.OverlayColor, 0, 3);
         FlowBox.SelectedIndex = Math.Clamp(AppSettings.Current.OverlayFlow, 0, 1);
         OpacitySlider.Value = Math.Clamp(AppSettings.Current.OverlayOpacity, 0, 100);
+        OpacityText.Text = $"{OpacitySlider.Value:0}%";
+        ThemeBox.ItemsSource = OverlaySkin.Names;
+        ThemeBox.SelectedIndex = Math.Clamp(AppSettings.Current.OverlayTheme, 0, OverlaySkin.Names.Length - 1);
+        AnimateBox.IsChecked = AppSettings.Current.OverlayAnimate;
+        _building = false;
         ApplyOverlayLook();
     }
 
     private void OverlayLayout_Changed(object sender, SelectionChangedEventArgs e)
     {
-        if (CornerBox == null || SizeBox == null || ColorBox == null || FlowBox == null || PreviewText == null ||
-            CornerBox.SelectedIndex < 0 || SizeBox.SelectedIndex < 0 || ColorBox.SelectedIndex < 0 || FlowBox.SelectedIndex < 0) return;
+        if (_building || CornerBox.SelectedIndex < 0 || SizeBox.SelectedIndex < 0 || ColorBox.SelectedIndex < 0 ||
+            FlowBox.SelectedIndex < 0 || ThemeBox.SelectedIndex < 0) return;
         var set = AppSettings.Current;
+        set.OverlayTheme = ThemeBox.SelectedIndex;
         set.OverlayCorner = CornerBox.SelectedIndex;
         set.OverlaySize = SizeBox.SelectedIndex;
         set.OverlayColor = ColorBox.SelectedIndex;
@@ -270,7 +280,7 @@ public partial class FpsView : UserControl
 
     private void Opacity_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (OpacityText == null || PreviewText == null) return;
+        if (_building) return;
         AppSettings.Current.OverlayOpacity = (int)OpacitySlider.Value;
         OpacityText.Text = $"{OpacitySlider.Value:0}%";
         AppSettings.Current.Save();
@@ -281,9 +291,29 @@ public partial class FpsView : UserControl
     private void ApplyOverlayLook()
     {
         var set = AppSettings.Current;
-        OverlayWindow.ApplyLook(PreviewBox, PreviewText, set.OverlaySize, set.OverlayOpacity);
-        _overlay?.SetLayout(set.OverlayCorner, set.OverlaySize, set.OverlayOpacity, set.OverlayFlow == 1);
+        // Animação só na prévia visível e no painel do jogo; esconder a página para a da prévia.
+        PreviewHost.Content = OverlaySkin.Build(set.OverlayTheme, PreviewText, set.OverlaySize, set.OverlayOpacity, set.OverlayAnimate && IsVisible);
+        _overlay?.SetLayout(set.OverlayCorner, set.OverlaySize, set.OverlayOpacity, set.OverlayFlow == 1, set.OverlayTheme, set.OverlayAnimate);
+        UpdateOverlay(Sample(null), null);
     }
+
+    private void Animate_Click(object sender, RoutedEventArgs e)
+    {
+        AppSettings.Current.OverlayAnimate = AnimateBox.IsChecked == true;
+        AppSettings.Current.Save();
+        ApplyOverlayLook();
+    }
+
+    private void AntiCheat_Click(object sender, RoutedEventArgs e) => MessageBox.Show(
+        "Como o SoNexus mede o FPS\n\n" +
+        "• Lê os eventos de desempenho que o próprio Windows publica para qualquer programa (ETW), o mesmo método do PresentMon e do CapFrameX.\n" +
+        "• Não abre, não lê e não altera a memória do jogo, não injeta DLL e não mexe nos arquivos do jogo.\n" +
+        "• O painel sobre o jogo é uma janela separada e transparente do Windows, como a do Discord: não desenha dentro do jogo.\n\n" +
+        "Por isso ele não funciona como um cheat e não dá vantagem a ninguém.\n\n" +
+        "Mesmo assim, nenhum programa pode garantir 100%: cada anti-cheat tem regras próprias e elas mudam. " +
+        "Em jogos competitivos, se o jogo reclamar ou você preferir não arriscar, desligue o painel e a medição. " +
+        "O SoNexus não tem ligação com nenhum jogo, empresa ou anti-cheat, e o uso é por sua conta (veja os Termos de Uso).",
+        "SoNexus — é seguro com anti-cheat?", MessageBoxButton.OK, MessageBoxImage.Information);
 
     /// <summary>Fecha a partida atual e guarda no histórico (aba "Seu PC e gargalo").</summary>
     private void EndSession()
@@ -365,7 +395,7 @@ public partial class FpsView : UserControl
     {
         if (_overlay == null && !IsVisible) return;
         var on = AppSettings.Current.OverlayItems.ToHashSet();
-        var value = OverlayWindow.ValueBrush(AppSettings.Current.OverlayColor);
+        var value = OverlaySkin.ValueBrush(AppSettings.Current.OverlayTheme, AppSettings.Current.OverlayColor);
         var accent = value;
         var lines = new List<(string, string, Brush)>();
         static string Join(IEnumerable<string?> parts) => string.Join("  ", parts.Where(p => !string.IsNullOrEmpty(p)));

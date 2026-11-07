@@ -6,7 +6,7 @@ namespace SoNexus.Services;
 public static class Terms
 {
     /// <summary>Aumente quando o texto mudar de forma relevante: todos terão de aceitar de novo.</summary>
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
 
     public static bool Accepted => AppSettings.Current.TermsVersion >= CurrentVersion;
 
