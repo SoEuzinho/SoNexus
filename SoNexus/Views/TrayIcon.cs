@@ -48,7 +48,7 @@ public sealed class TrayIcon : IDisposable
         foreach (var (label, nav, tab) in new (string, string, string?)[]
                  {
                      ("Início", "NavHome", null), ("Sensores", "NavHardware", "Todos os sensores"), ("FPS ao vivo", "NavGames", "FPS ao vivo"),
-                     ("Overclock e ventoinhas", "NavGames", "Overclock"), ("Iluminação RGB", "NavIntegration", "Iluminação RGB"),
+                     ("Overclock e ventoinhas", "NavPerf", "Overclock"), ("Iluminação RGB", "NavIntegration", "Iluminação RGB"),
                      ("Rotas de jogos", "NavNetwork", "Rotas e servidores de jogos"), ("Configurações", "NavSettings", null),
                  })
             go.DropDownItems.Add(label, null, (_, _) => _window.Navigate(nav, tab));

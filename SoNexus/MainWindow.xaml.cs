@@ -242,8 +242,15 @@ public partial class MainWindow : Window
                     ("Biblioteca", () => new GameLibraryView()),
                     ("Seu PC e gargalo", () => new GameAnalysisView()),
                     ("FPS ao vivo", () => new FpsView()),
-                    ("Overclock", () => new OverclockView()),
                     ("Realidade virtual", () => new VrView())),
+                // Tudo de medir e forçar o PC num lugar só (as mesmas telas aparecem também na peça, em Hardware).
+                nameof(NavPerf) => new SectionView(
+                    ("Teste completo", () => new PerfTestView()),
+                    ("Processador", () => SharedPages.Get<BenchmarkView>()),
+                    ("Placa de vídeo, RAM e disco", () => SharedPages.Get<HardwareBenchView>()),
+                    ("Stress test", () => SharedPages.Get<StressView>()),
+                    ("Overclock", () => new OverclockView()),
+                    ("EXPO, PBO e BIOS", () => new BiosGuideView())),
                 nameof(NavNetwork) => new SectionView(
                     ("Visão geral", () => new NetworkView()),
                     ("Aplicativos e conexões", () => new NetworkAppsView()),

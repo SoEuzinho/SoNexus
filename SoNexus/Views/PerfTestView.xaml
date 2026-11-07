@@ -1,0 +1,128 @@
+<UserControl x:Class="SoNexus.Views.PerfTestView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Resources>
+        <Style x:Key="Label" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
+        </Style>
+    </UserControl.Resources>
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="0,0,12,12">
+            <TextBlock Text="Teste completo" Style="{StaticResource H1}"/>
+            <TextBlock Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,16" TextWrapping="Wrap"
+                       Text="Mede processador, placa de vídeo, VRAM, RAM e disco, 3 vezes cada, e guarda o resultado. Rode antes e depois de uma mudança (EXPO ligado, pasta térmica nova, driver novo, overclock) para ver se melhorou de verdade."/>
+
+            <!-- Rodar -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="NOME DESTA MEDIÇÃO (OPCIONAL)" Style="{StaticResource Label}"/>
+                            <TextBox x:Name="LabelBox" Margin="0,4,0,8" MaxWidth="420" HorizontalAlignment="Left" Width="420" MaxLength="40"
+                                     ToolTip="Ex.: antes do EXPO, depois da pasta térmica"/>
+                            <CheckBox x:Name="DiskBox" Content="Incluir o disco do sistema (grava 512 MB temporários e apaga)" IsChecked="True"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <Button x:Name="StartButton" Content="Iniciar teste completo" Style="{StaticResource PrimaryButton}" Click="Start_Click"/>
+                            <Button x:Name="CancelButton" Content="Cancelar" Visibility="Collapsed" Click="Cancel_Click"/>
+                            <TextBlock Text="cerca de 3 minutos" Style="{StaticResource Muted}" FontSize="11" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Grid>
+                    <StackPanel x:Name="RunPanel" Visibility="Collapsed" Margin="0,14,0,0">
+                        <DockPanel>
+                            <TextBlock x:Name="TempText" DockPanel.Dock="Right" Style="{StaticResource Muted}"/>
+                            <TextBlock x:Name="StepText" FontWeight="SemiBold"/>
+                        </DockPanel>
+                        <ProgressBar x:Name="Bar" Style="{StaticResource Meter}" Foreground="White" Maximum="1" Margin="0,8,0,0"/>
+                        <TextBlock Style="{StaticResource Muted}" FontSize="11" Margin="0,6,0,0" TextWrapping="Wrap"
+                                   Text="Feche jogos e programas pesados para o resultado ser justo. Para sozinho se o processador passar de 95 °C ou a placa de 90 °C."/>
+                    </StackPanel>
+                    <TextBlock x:Name="SensorWarn" Visibility="Collapsed" Foreground="{StaticResource DangerBrush}" Margin="0,10,0,0" TextWrapping="Wrap"
+                               Text="Sem leitura de temperatura (abra o SoNexus como administrador): o corte de segurança por temperatura não vai funcionar."/>
+                </StackPanel>
+            </Border>
+
+            <!-- Resultado -->
+            <Border x:Name="ResultCard" Style="{StaticResource Card}" Margin="0,0,0,12" Visibility="Collapsed">
+                <StackPanel>
+                    <DockPanel>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <TextBlock Text="Comparar com" Style="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <ComboBox x:Name="BaseBox" Width="260" DisplayMemberPath="Title" SelectionChanged="Base_Changed"/>
+                        </StackPanel>
+                        <StackPanel>
+                            <TextBlock Text="RESULTADO" Style="{StaticResource Label}"/>
+                            <TextBlock x:Name="ResultTitle" FontSize="16" FontWeight="SemiBold" Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </DockPanel>
+                    <Grid Margin="0,14,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="2*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="1.4*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="ITEM" Style="{StaticResource Label}"/>
+                        <TextBlock Grid.Column="1" Text="AGORA" Style="{StaticResource Label}"/>
+                        <TextBlock Grid.Column="2" Text="ANTES" Style="{StaticResource Label}"/>
+                        <TextBlock Grid.Column="3" Text="MUDOU?" Style="{StaticResource Label}"/>
+                    </Grid>
+                    <ItemsControl x:Name="Rows">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Padding="0,7">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="2*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="1.4*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Item}"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding NowText}" FontWeight="SemiBold"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding BeforeText}" Foreground="{StaticResource MutedBrush}"/>
+                                        <TextBlock Grid.Column="3" Text="{Binding Verdict}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock x:Name="ResultInfo" Style="{StaticResource Muted}" FontSize="12" Margin="0,10,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Histórico -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Text="MEDIÇÕES SALVAS" Style="{StaticResource Label}"/>
+                    <TextBlock x:Name="HistoryEmpty" Style="{StaticResource Muted}" Margin="0,6,0,0" TextWrapping="Wrap"
+                               Text="Nenhuma ainda. As notas são deste PC: servem para comparar com ele mesmo, não com outros computadores."/>
+                    <ItemsControl x:Name="HistoryList" Margin="0,6,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Padding="0,7">
+                                    <DockPanel>
+                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                            <Button Content="Ver" Tag="{Binding}" Click="Show_Click" Margin="0,0,6,0"/>
+                                            <Button Content="Apagar" Tag="{Binding}" Click="Delete_Click"/>
+                                        </StackPanel>
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
+                                            <TextBlock Text="{Binding Summary}" Style="{StaticResource Muted}" FontSize="12" TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

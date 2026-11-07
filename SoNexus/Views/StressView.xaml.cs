@@ -30,6 +30,9 @@ public partial class StressView : UserControl
         _timer.Tick += (_, _) => Tick();
     }
 
+    /// <summary>Stress em andamento (o Teste completo espera ele parar).</summary>
+    public bool IsRunning => _cts is { IsCancellationRequested: false };
+
     /// <summary>Modos em que os números principais são os da placa de vídeo.</summary>
     private bool GpuFocus => _mode is StressMode.Gpu or StressMode.Vram;
     private bool UsesGpu => _mode is StressMode.Gpu or StressMode.Vram or StressMode.Tudo;

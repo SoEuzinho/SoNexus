@@ -60,7 +60,7 @@ public partial class IntegrationsView : UserControl
         var gpus = Safe(DriverService.GetGpuDrivers) ?? new();
         var main = gpus.FirstOrDefault(g => g.Vendor == "NVIDIA") ?? gpus.FirstOrDefault();
         cards.Add(main?.Vendor == "NVIDIA"
-            ? new("", "Placa de vídeo NVIDIA", $"{main.Name}: monitoramento, driver com 1 clique, overclock e ventoinhas.", "Completo", true, "Overclock e ventoinhas", "NavGames", "Overclock")
+            ? new("", "Placa de vídeo NVIDIA", $"{main.Name}: monitoramento, driver com 1 clique, overclock e ventoinhas.", "Completo", true, "Overclock e ventoinhas", "NavPerf", "Overclock")
             : new("", "Placa de vídeo", main != null ? $"{main.Name}: monitoramento, benchmark e driver. Overclock só em placas NVIDIA." : "Nenhuma placa de vídeo detectada.",
                 main != null ? "Monitorando" : "—", main != null, "Driver da placa", "NavDrivers", "Placa de vídeo"));
 

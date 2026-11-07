@@ -12,7 +12,7 @@
     <AssemblyName>SoNexus</AssemblyName>
     <RootNamespace>SoNexus</RootNamespace>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Version>0.22.0</Version>
+    <Version>0.23.0</Version>
     <!-- Roda em qualquer PC Windows 10/11 de 64 bits, sem precisar instalar o .NET.
          Pasta comum (sem "arquivo único" compactado) para não parecer suspeito aos antivírus. -->
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>

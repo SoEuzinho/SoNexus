@@ -48,6 +48,7 @@
                     <RadioButton x:Name="NavOptim" Style="{StaticResource NavButton}" GroupName="Nav" Tag="&#xE9F5;" Content="Otimização" Checked="Nav_Checked"/>
                     <RadioButton x:Name="NavDrivers" Style="{StaticResource NavButton}" GroupName="Nav" Tag="&#xE895;" Content="Drivers" Checked="Nav_Checked"/>
                     <RadioButton x:Name="NavGames" Style="{StaticResource NavButton}" GroupName="Nav" Tag="&#xE7FC;" Content="Jogos" Checked="Nav_Checked"/>
+                    <RadioButton x:Name="NavPerf" Style="{StaticResource NavButton}" GroupName="Nav" Tag="&#xEC4A;" Content="Desempenho" Checked="Nav_Checked"/>
                     <RadioButton x:Name="NavNetwork" Style="{StaticResource NavButton}" GroupName="Nav" Tag="&#xE968;" Content="Rede" Checked="Nav_Checked"/>
                     <RadioButton x:Name="NavAudio" Style="{StaticResource NavButton}" GroupName="Nav" Tag="&#xE767;" Content="Áudio" Checked="Nav_Checked"/>
                     <RadioButton x:Name="NavDiag" Style="{StaticResource NavButton}" GroupName="Nav" Tag="&#xE9D9;" Content="Diagnóstico" Checked="Nav_Checked"/>
