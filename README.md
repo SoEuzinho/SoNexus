@@ -60,7 +60,7 @@ Em vez de ter CPU-Z, HWMonitor, MSI Afterburner, Process Lasso, RAMMap, Ninite e
 
 ## Vídeos
 
-- 🎬 **[Vídeo de divulgação (40 s)](docs/media/divulgacao.mp4)**: o SoNexus em 40 segundos, para compartilhar.
+- 🎬 **[Vídeo de divulgação (1min15)](docs/media/divulgacao.mp4)**: narrado, com animações e capítulos, para compartilhar.
 - ▶ **[Demonstração completa (47 s)](docs/media/demo.mp4)**: passando pelas telas do app.
 
 ## Instalar
