@@ -111,7 +111,7 @@ O SoNexus usa bibliotecas e componentes de terceiros, cada um com a sua licença
 instalado somente se você pedir, a partir do instalador oficial e assinado do autor dele.
 Marcas citadas (NVIDIA, AMD, Intel, Microsoft, Steam, Valve, ASUS, entre outras)
 pertencem aos seus donos; o SoNexus não é afiliado a elas.
-Os temas do painel sobre o jogo (Neon, Imperial, Pixel, Arena, Fofo etc.) são desenhos
+Os temas do painel sobre o jogo (Neon, Imperial, Pixel, Arena, Fofo, Cristal etc.) são desenhos
 originais do SoNexus: não usam logos, nomes ou personagens de jogos ou empresas e não
 indicam parceria, patrocínio ou aprovação de ninguém.
 

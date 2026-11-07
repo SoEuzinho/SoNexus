@@ -41,7 +41,9 @@
                             <GradientStop Color="#FF1A2230" Offset="1"/>
                         </LinearGradientBrush>
                     </Border.Background>
-                    <ContentControl x:Name="PreviewHost" HorizontalAlignment="Left" VerticalAlignment="Top"/>
+                    <Viewbox StretchDirection="DownOnly" HorizontalAlignment="Left" VerticalAlignment="Top">
+                        <ContentControl x:Name="PreviewHost"/>
+                    </Viewbox>
                 </Border>
                 <DockPanel Margin="0,0,0,8">
                     <CheckBox x:Name="AnimateBox" DockPanel.Dock="Right" Content="Animar" VerticalAlignment="Center" Margin="10,0,0,0" Click="Animate_Click"
