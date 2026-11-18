@@ -7,7 +7,7 @@
             <StackPanel Margin="0,0,380,0">
                 <TextBlock Text="Biblioteca de jogos" Style="{StaticResource H1}"/>
                 <TextBlock x:Name="Status" Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,0" TextWrapping="Wrap"
-                           Text="Procurando jogos em todos os launchers..."/>
+                           Text="Procurando instalações nos launchers compatíveis..."/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                 <Grid Width="200" Margin="0,0,8,0">
@@ -59,7 +59,10 @@
                                 <Grid Height="110" Background="#111111">
                                     <Image Source="{Binding Image, TargetNullValue={x:Null}}" Stretch="UniformToFill" Opacity="0.85"/>
                                     <Border Background="#CC000000" CornerRadius="4" Padding="8,3" Margin="10" HorizontalAlignment="Right" VerticalAlignment="Top">
-                                        <TextBlock Text="{Binding Estimate}" FontWeight="SemiBold" FontFamily="Consolas"/>
+                                        <StackPanel>
+                                            <TextBlock Text="Estimativa" FontSize="11" Foreground="{StaticResource MutedBrush}"/>
+                                            <TextBlock Text="{Binding Estimate}" FontWeight="SemiBold" FontFamily="Consolas"/>
+                                        </StackPanel>
                                     </Border>
                                 </Grid>
                                 <StackPanel Margin="14,10,14,12">

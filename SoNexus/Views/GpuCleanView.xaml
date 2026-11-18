@@ -6,7 +6,7 @@
         <StackPanel DockPanel.Dock="Top" Margin="0,0,0,14">
             <TextBlock Text="Remover driver de vídeo" Style="{StaticResource H1}"/>
             <TextBlock Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,0" TextWrapping="Wrap"
-                       Text="Apaga completamente o driver da placa de vídeo (como o DDU) para instalar um driver limpo. Use quando o vídeo travar, der tela preta ou ao trocar de placa."/>
+                       Text="Remove os pacotes selecionados do DriverStore do Windows para preparar uma instalação limpa."/>
         </StackPanel>
 
         <!-- Modo de segurança -->
@@ -37,12 +37,13 @@
                             <TextBlock x:Name="DetectedText" Style="{StaticResource Muted}" Margin="0,6,0,0" TextWrapping="Wrap"/>
 
                             <TextBlock Text="2. O que remover" Style="{StaticResource H2}" Margin="0,18,0,8"/>
+                            <CheckBox x:Name="BackupDrivers" Content="Exportar backup dos pacotes antes" IsChecked="True" Margin="0,0,0,8"/>
                             <CheckBox x:Name="RestorePoint" Content="Criar ponto de restauração antes" IsChecked="True" Margin="0,0,0,8"/>
-                            <CheckBox x:Name="IncludeAudio" Content="Áudio HDMI/DisplayPort da placa" IsChecked="True" Margin="0,0,0,8" Click="IncludeAudio_Click"/>
-                            <CheckBox x:Name="RemoveServices" Content="Serviços do fabricante" IsChecked="True" Margin="0,0,0,8"/>
-                            <CheckBox x:Name="RemovePanel" Content="Painel de controle (app da Store)" IsChecked="True" Margin="0,0,0,8"/>
-                            <CheckBox x:Name="RemoveFolders" Content="Pastas e caches de shader" IsChecked="True" Margin="0,0,0,8"/>
-                            <CheckBox x:Name="BlockUpdate" Content="Impedir o Windows Update de reinstalar driver" IsChecked="True"/>
+                            <CheckBox x:Name="IncludeAudio" Content="Áudio HDMI/DisplayPort identificado" Margin="0,0,0,8" Click="IncludeAudio_Click"/>
+                            <CheckBox x:Name="RemoveServices" Content="Serviços gráficos do fabricante" Margin="0,0,0,8"/>
+                            <CheckBox x:Name="RemovePanel" Content="Painel de controle (app da Store)" Margin="0,0,0,8"/>
+                            <CheckBox x:Name="RemoveFolders" Content="Caches gráficos do fabricante" Margin="0,0,0,8"/>
+                            <CheckBox x:Name="BlockUpdate" Content="Desativar busca automática de drivers"/>
                             <TextBlock x:Name="AutoInstallText" Style="{StaticResource Muted}" Margin="26,4,0,0" TextWrapping="Wrap"/>
                             <Button x:Name="UnblockButton" Content="Liberar instalação automática de novo" HorizontalAlignment="Left"
                                     Margin="26,6,0,0" Click="Unblock_Click"/>
@@ -55,7 +56,8 @@
                             <TextBlock Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,12"
                                        Text="A tela vai piscar e ficar em baixa resolução até você instalar o driver novo. Feche jogos e programas antes."/>
                             <Button x:Name="CleanButton" Content="Remover driver de vídeo" Style="{StaticResource PrimaryButton}"
-                                    Margin="0,0,0,8" Click="Clean_Click"/>
+                                    Margin="0,0,0,8" IsEnabled="False" Click="Clean_Click"/>
+                            <Button x:Name="RestoreDriverButton" Content="Reinstalar pacote de um backup" Margin="0,0,0,8" Click="RestoreDriver_Click"/>
                             <Button x:Name="RebootButton" Content="Reiniciar o PC agora" Click="Reboot_Click"/>
                         </StackPanel>
                     </Border>
@@ -88,8 +90,10 @@
                 </Border>
                 <Border Style="{StaticResource Card}">
                     <DockPanel>
-                        <TextBlock DockPanel.Dock="Top" Text="Pacotes de driver que serão apagados" Style="{StaticResource H2}"/>
-                        <TextBlock x:Name="PackageStatus" DockPanel.Dock="Top" Style="{StaticResource Muted}" Margin="0,2,0,8"/>
+                        <Button x:Name="RefreshButton" DockPanel.Dock="Top" Content="Atualizar pacotes" HorizontalAlignment="Right"
+                                IsEnabled="False" Click="Refresh_Click"/>
+                        <TextBlock DockPanel.Dock="Top" Text="Pacotes disponíveis para remoção" Style="{StaticResource H2}"/>
+                        <TextBlock x:Name="PackageStatus" DockPanel.Dock="Top" Style="{StaticResource Muted}" Margin="0,2,0,8" TextWrapping="Wrap"/>
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <ItemsControl x:Name="PackageList">
                                 <ItemsControl.ItemTemplate>

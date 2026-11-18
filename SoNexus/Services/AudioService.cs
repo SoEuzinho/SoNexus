@@ -9,7 +9,7 @@ using SoNexus.Models;
 namespace SoNexus.Services;
 
 /// <summary>Um alto-falante, fone, microfone ou dispositivo virtual.</summary>
-public sealed class AudioDevice : ObservableObject
+public sealed class AudioDevice : ObservableObject, IDisposable
 {
     private double _peak;
     private int _volume;
@@ -73,7 +73,8 @@ public sealed class AudioDevice : ObservableObject
                 if (BitConverter.ToUInt16(wf, 0) == 0xFFFE && wf.Length >= 20) bits = BitConverter.ToUInt16(wf, 18);
                 return $"{rate / 1000.0:0.#} kHz · {bits} bits · {channels} canais";
             }
-            var mix = d.AudioClient.MixFormat;
+            using var client = d.AudioClient;
+            var mix = client.MixFormat;
             return $"{mix.SampleRate / 1000.0:0.#} kHz · {mix.BitsPerSample} bits · {mix.Channels} canais";
         }
         catch
@@ -86,7 +87,7 @@ public sealed class AudioDevice : ObservableObject
     {
         try
         {
-            var client = d.AudioClient;
+            using var client = d.AudioClient;
             // Períodos em unidades de 100 ns.
             return $"{client.DefaultDevicePeriod / 10000.0:0.#} ms (mín. {client.MinimumDevicePeriod / 10000.0:0.#} ms)";
         }
@@ -100,29 +101,36 @@ public sealed class AudioDevice : ObservableObject
     {
         try { return f(); } catch { return fallback; }
     }
+
+    public void Dispose() => Device.Dispose();
 }
 
 /// <summary>Um aplicativo tocando som agora (Discord, jogo, navegador...).</summary>
-public sealed class AudioApp : ObservableObject
+public sealed class AudioApp : ObservableObject, IDisposable
 {
     private double _peak;
     private int _volume;
 
-    internal AudioApp(AudioSessionControl session, string device)
+    internal AudioApp(AudioSessionControl session, AudioDevice device)
     {
         Session = session;
-        Device = device;
+        Device = device.Name;
+        DeviceId = device.Id;
+        try { SessionId = session.GetSessionInstanceIdentifier; }
+        catch { SessionId = Guid.NewGuid().ToString(); }
         var pid = (int)session.GetProcessID;
         Pid = pid;
         if (session.IsSystemSoundsSession) Name = "Sons do sistema";
         else
         {
-            try { using var p = Process.GetProcessById(pid); Name = string.IsNullOrWhiteSpace(p.MainWindowTitle) ? p.ProcessName : p.ProcessName; }
+            try { using var p = Process.GetProcessById(pid); Name = p.ProcessName; }
             catch { Name = session.DisplayName is { Length: > 0 } n ? n : $"PID {pid}"; }
         }
     }
 
     internal AudioSessionControl Session { get; }
+    internal string DeviceId { get; }
+    internal string SessionId { get; }
     public int Pid { get; }
     public string Name { get; } = "";
     public string Device { get; }
@@ -134,6 +142,8 @@ public sealed class AudioApp : ObservableObject
         try { Peak = Session.AudioMeterInformation.MasterPeakValue * 100; } catch { }
         try { Volume = (int)Math.Round(Session.SimpleAudioVolume.Volume * 100); } catch { }
     }
+
+    public void Dispose() => Session.Dispose();
 }
 
 public sealed record AudioSoftware(string Name, string Status, string Detail);
@@ -157,14 +167,25 @@ public static class AudioService
         using var enumerator = new MMDeviceEnumerator();
         string? DefaultId(DataFlow flow)
         {
-            try { return enumerator.GetDefaultAudioEndpoint(flow, Role.Multimedia).ID; } catch { return null; }
+            try
+            {
+                using var endpoint = enumerator.GetDefaultAudioEndpoint(flow, Role.Multimedia);
+                return endpoint.ID;
+            }
+            catch { return null; }
         }
         var defaultOut = DefaultId(DataFlow.Render);
         var defaultIn = DefaultId(DataFlow.Capture);
 
         foreach (var d in enumerator.EnumerateAudioEndPoints(DataFlow.All, DeviceState.Active))
         {
-            var device = new AudioDevice(d, d.ID == defaultOut || d.ID == defaultIn);
+            AudioDevice device;
+            try { device = new AudioDevice(d, d.ID == defaultOut || d.ID == defaultIn); }
+            catch (COMException)
+            {
+                d.Dispose();
+                continue;
+            }
             devices.Add(device);
             if (device.IsInput) continue;
             try
@@ -173,10 +194,18 @@ public static class AudioService
                 for (var i = 0; i < sessions.Count; i++)
                 {
                     var s = sessions[i];
-                    // "Sons do sistema" existe em todo dispositivo e só polui a lista.
-                    if (s.IsSystemSoundsSession || s.State == NAudio.CoreAudioApi.Interfaces.AudioSessionState.AudioSessionStateExpired) continue;
-                    var app = new AudioApp(s, device.Name);
-                    if (!apps.Any(a => a.Pid == app.Pid && a.Device == app.Device)) apps.Add(app);
+                    var retained = false;
+                    try
+                    {
+                        // "Sons do sistema" existe em todo dispositivo e só polui a lista.
+                        if (s.IsSystemSoundsSession || s.State == NAudio.CoreAudioApi.Interfaces.AudioSessionState.AudioSessionStateExpired) continue;
+                        var app = new AudioApp(s, device);
+                        if (apps.Any(a => a.Pid == app.Pid && a.DeviceId == app.DeviceId)) continue;
+                        apps.Add(app);
+                        retained = true;
+                    }
+                    catch { } // a sessão pode desaparecer enquanto é listada
+                    finally { if (!retained) s.Dispose(); }
                 }
             }
             catch { }
@@ -445,12 +474,13 @@ public sealed class VoicemeeterRemote : IDisposable
         foreach (var b in Buses) b.Level = ToPercent(MaxLevel(3, b.Index * 8, 8));
     }
 
-    public void ToggleMute(VmChannel c)
+    public bool ToggleMute(VmChannel c)
     {
-        if (!Connected || _setFloat == null) return;
+        if (!Connected || _setFloat == null) return false;
         var name = c.IsBus ? $"Bus[{c.Index}].Mute" : $"Strip[{c.Index}].Mute";
-        _setFloat(name, c.Mute ? 0 : 1);
+        if (_setFloat(name, c.Mute ? 0 : 1) != 0) return false;
         c.Mute = !c.Mute;
+        return true;
     }
 
     private float MaxLevel(int type, int start, int count)

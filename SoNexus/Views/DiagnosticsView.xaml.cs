@@ -1,6 +1,8 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using Microsoft.Win32;
 using SoNexus.Models;
 using SoNexus.Services;
 
@@ -31,7 +33,25 @@ public partial class DiagnosticsView : UserControl
         VerdictText.Text = "Lendo os registros do Windows...";
         VerdictText.Foreground = (Brush)FindResource("TextBrush");
 
-        var r = await Task.Run(() => DiagnosticsService.Analyze(days));
+        ReportPreview.Clear();
+        SaveReportButton.IsEnabled = false;
+        SaveReportStatus.Text = "";
+        DiagReport r;
+        try
+        {
+            (r, ReportPreview.Text) = await Task.Run(() =>
+            {
+                var report = DiagnosticsService.Analyze(days);
+                return (report, SupportReport.Build(report, days));
+            });
+            SaveReportButton.IsEnabled = true;
+        }
+        catch (Exception ex)
+        {
+            VerdictText.Text = $"Não foi possível analisar: {ex.Message}";
+            AnalyzeBar.IsEnabled = true;
+            return;
+        }
 
         Cards.ItemsSource = new[]
         {
@@ -62,6 +82,26 @@ public partial class DiagnosticsView : UserControl
         VerdictText.Foreground = color;
         Verdict.BorderBrush = color;
         AnalyzeBar.IsEnabled = true;
+    }
+
+    private void SaveReport_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new SaveFileDialog
+        {
+            FileName = "sonexus-relatorio",
+            DefaultExt = ".txt",
+            Filter = "Relatório de suporte (*.txt)|*.txt",
+        };
+        if (dialog.ShowDialog() != true) return;
+        try
+        {
+            File.WriteAllText(dialog.FileName, ReportPreview.Text);
+            SaveReportStatus.Text = "Relatório salvo.";
+        }
+        catch (Exception ex)
+        {
+            SaveReportStatus.Text = $"Não foi possível salvar: {ex.Message}";
+        }
     }
 
     private static Card Count(int n, string title, int warnAt) =>

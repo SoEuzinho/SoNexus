@@ -52,12 +52,15 @@ public partial class VrView : UserControl
         }
         var (codec, codecDetail) = VrService.Encoder(pc.Gpu);
         checks.Add(new InfoItem($"✔ Codec recomendado: {codec}", codecDetail));
-        checks.Add(new InfoItem(pc.GpuScore >= 300 ? "✔ Placa de vídeo forte para VR" : pc.GpuScore >= 170 ? "• Placa de vídeo boa para VR" : "✖ Placa de vídeo no limite para VR",
-            pc.GpuScore >= 300
-                ? "Dá para usar qualidade Ultra/Godlike no Virtual Desktop em 90 Hz na maioria dos jogos."
-                : pc.GpuScore >= 170 ? "Use qualidade Alta em 72-90 Hz; nos jogos pesados, ative o SSW." : "Use qualidade Média em 72 Hz e reduza a resolução nos jogos."));
+        if (!pc.GpuScoreKnown)
+            checks.Add(new InfoItem("• GPU sem referência para VR", "O modelo da placa não consta na tabela de desempenho."));
+        else
+            checks.Add(new InfoItem("• Ponto de partida estimado para VR",
+                pc.GpuScore >= 300 ? "Experimente qualidade alta em 90 Hz e confira a estabilidade durante o jogo."
+                    : pc.GpuScore >= 170 ? "Experimente qualidade alta em 72 Hz."
+                    : "Experimente qualidade média em 72 Hz e reduza a resolução se houver engasgos."));
         if (pc.RamSticks == 1)
-            checks.Add(new InfoItem("• Memória em canal único", "VR é sensível a engasgos; dois pentes de RAM deixam o tempo de quadro mais estável."));
+            checks.Add(new InfoItem("• Um módulo de RAM detectado", "A configuração dos canais de memória depende da placa e do tipo de RAM."));
         CheckList.ItemsSource = checks;
 
         await LoadVrGamesAsync(pc);

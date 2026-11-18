@@ -27,7 +27,7 @@ public sealed class TrayIcon : IDisposable
         var battery = s.BatterySaver && SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Offline;
         if (battery == _onBattery) return;
         _onBattery = battery;
-        HardwareService.Instance.IntervalMs = battery ? Math.Max(5000, s.SensorIntervalMs) : s.SensorIntervalMs;
+        HardwareService.Instance.BatterySaver = battery;
         RgbService.Instance.BatterySaver = battery;
     }
 
@@ -86,6 +86,7 @@ public sealed class TrayIcon : IDisposable
         _icon.MouseClick += (_, e) => { if (e.Button == MouseButtons.Left) _window.ShowFromTray(); };
         _icon.BalloonTipClicked += (_, _) => _window.ShowFromTray();
 
+        ApplyBatterySaver(AppSettings.Current);
         _timer.Tick += (_, _) => UpdateStatus();
         _timer.Start();
     }
@@ -205,7 +206,12 @@ internal static class MemoryTrim
     public static void Now()
     {
         GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, true, true);
-        try { SetProcessWorkingSetSize(System.Diagnostics.Process.GetCurrentProcess().Handle, -1, -1); } catch { }
+        try
+        {
+            using var process = System.Diagnostics.Process.GetCurrentProcess();
+            SetProcessWorkingSetSize(process.Handle, -1, -1);
+        }
+        catch { }
     }
 
     [DllImport("kernel32.dll")]

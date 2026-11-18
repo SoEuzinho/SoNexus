@@ -4,6 +4,11 @@ using System.Text.Json;
 
 namespace SoNexus.Services;
 
+internal static class HardwareTest
+{
+    internal static readonly SemaphoreSlim Slot = new(1, 1);
+}
+
 public sealed record BenchResult(DateTime Date, string Cpu, int Threads, double Single, double Multi)
 {
     public string DateText => Date.ToString("dd/MM/yyyy HH:mm");

@@ -97,14 +97,23 @@ public partial class NetworkView : UserControl
     {
         PingButton.IsEnabled = false;
         PingButton.Content = "Testando...";
-        var gateway = NetworkService.Adapters().FirstOrDefault()?.Gateways.FirstOrDefault();
-        var tasks = new List<Task<PingResult>>();
-        if (gateway != null) tasks.Add(NetworkService.PingAsync("Seu roteador", gateway));
-        tasks.Add(NetworkService.PingAsync("Cloudflare", "1.1.1.1"));
-        tasks.Add(NetworkService.PingAsync("Google DNS", "8.8.8.8"));
-        tasks.Add(NetworkService.PingAsync("google.com", "google.com"));
-        PingGrid.ItemsSource = await Task.WhenAll(tasks);
-        PingButton.Content = "Testar conexão";
-        PingButton.IsEnabled = true;
+        try
+        {
+            var gateway = NetworkService.Adapters().FirstOrDefault()?.Gateways.FirstOrDefault();
+            var tasks = new List<Task<PingResult>>();
+            if (gateway != null) tasks.Add(NetworkService.PingAsync("Seu roteador", gateway));
+            if (AppSettings.Current.AllowOnline)
+            {
+                tasks.Add(NetworkService.PingAsync("Cloudflare", "1.1.1.1"));
+                tasks.Add(NetworkService.PingAsync("Google DNS", "8.8.8.8"));
+                tasks.Add(NetworkService.PingAsync("google.com", "google.com"));
+            }
+            PingGrid.ItemsSource = await Task.WhenAll(tasks);
+        }
+        finally
+        {
+            PingButton.Content = "Testar conexão";
+            PingButton.IsEnabled = true;
+        }
     }
 }

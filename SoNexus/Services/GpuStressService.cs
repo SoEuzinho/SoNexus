@@ -7,6 +7,8 @@ using Vortice.DXGI;
 
 namespace SoNexus.Services;
 
+internal sealed class HardwareTestSafetyException(string message) : InvalidOperationException(message);
+
 /// <summary>
 /// Testes na placa de vídeo pelo Direct3D 11 (funciona em NVIDIA, AMD e Intel, sem instalar nada):
 /// - Computação: todos os núcleos da GPU repetem um cálculo e o resultado é conferido com a primeira rodada
@@ -135,8 +137,10 @@ public sealed class GpuTester : IDisposable
     // ---------- Computação ----------
 
     /// <summary>Roda até cancelar. Cada lote leva ~0,3 s para não acionar o "reset" de driver do Windows (TDR).</summary>
-    public void RunCompute(CancellationToken ct)
+    public void RunCompute(CancellationToken ct, float temperatureLimit = 90)
     {
+        if (ct.IsCancellationRequested) return;
+        CheckTemperature(temperatureLimit);
         using var shader = Shader(ComputeHlsl.Replace("ITER", ComputeIterations.ToString()), "Main");
         using var buffer = StructuredBuffer(ComputeElements, 16);
         using var uav = Uav(buffer, ComputeElements);
@@ -149,6 +153,7 @@ public sealed class GpuTester : IDisposable
         var batch = 1;
         while (!ct.IsCancellationRequested)
         {
+            CheckTemperature(temperatureLimit);
             var sw = Stopwatch.StartNew();
             for (var i = 0; i < batch; i++) _context.Dispatch(ComputeElements / 256, 1, 1);
             _context.CopyResource(staging, buffer);
@@ -180,8 +185,10 @@ public sealed class GpuTester : IDisposable
     // ---------- VRAM ----------
 
     /// <summary>Preenche até 80% da memória de vídeo e confere passada por passada, até cancelar.</summary>
-    public void RunVram(CancellationToken ct, Action<string>? progress = null)
+    public void RunVram(CancellationToken ct, float temperatureLimit = 90, Action<string>? progress = null)
     {
+        if (ct.IsCancellationRequested) return;
+        CheckTemperature(temperatureLimit);
         using var write = Shader(VramHlsl, "Write");
         using var check = Shader(VramHlsl, "Check");
         using var parameters = _device.CreateBuffer(new BufferDescription(16, BindFlags.ConstantBuffer, ResourceUsage.Default));
@@ -196,6 +203,7 @@ public sealed class GpuTester : IDisposable
         {
             while ((blocks.Count + 1) * VramBlockBytes <= target && !ct.IsCancellationRequested)
             {
+                CheckTemperature(temperatureLimit);
                 try
                 {
                     var b = StructuredBuffer(VramBlockBytes / 4, 4);
@@ -203,6 +211,7 @@ public sealed class GpuTester : IDisposable
                 }
                 catch { break; }
             }
+            if (ct.IsCancellationRequested) return;
             if (blocks.Count == 0) throw new InvalidOperationException("Não foi possível reservar memória de vídeo para o teste.");
             VramTested = (ulong)(blocks.Count * VramBlockBytes);
             progress?.Invoke($"Testando {SoNexus.Models.Format.Bytes(VramTested)} de memória de vídeo");
@@ -214,6 +223,7 @@ public sealed class GpuTester : IDisposable
             uint seed = 0x9E3779B9;
             while (!ct.IsCancellationRequested)
             {
+                CheckTemperature(temperatureLimit);
                 var sw = Stopwatch.StartNew();
                 seed = seed * 1664525 + 1013904223;
                 _context.UpdateSubresource(new[] { seed, count, groupsX * 256, 0u }, parameters);
@@ -255,6 +265,16 @@ public sealed class GpuTester : IDisposable
                 b.Dispose();
             }
         }
+    }
+
+    private void CheckTemperature(float limit)
+    {
+        var readings = HardwareService.TestGpuReadings(HardwareService.Instance.FreshReadings, AdapterName);
+        var temperature = HardwareService.TestGpuTemp(readings);
+        if (temperature == null)
+            throw new HardwareTestSafetyException($"sem leitura recente de temperatura da GPU {AdapterName}");
+        if (temperature >= limit)
+            throw new HardwareTestSafetyException($"a GPU {AdapterName} chegou a {temperature:0} °C (limite {limit:0} °C)");
     }
 
     public void Dispose()

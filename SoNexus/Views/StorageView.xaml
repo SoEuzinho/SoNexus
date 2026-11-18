@@ -27,8 +27,9 @@
                 <TextBlock Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,0" TextWrapping="Wrap"
                            Text="Saúde real de cada SSD, NVMe e HD pelo SMART, vida útil, setores defeituosos e uma varredura de superfície que só lê o disco."/>
             </StackPanel>
-            <Button Content="Atualizar" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Right" VerticalAlignment="Center" Click="Reload_Click"/>
+            <Button x:Name="ReloadButton" Content="Atualizar" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Right" VerticalAlignment="Center" Click="Reload_Click"/>
         </Grid>
+        <TextBlock x:Name="LoadStatus" DockPanel.Dock="Top" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,14,12" Visibility="Collapsed"/>
 
         <Grid>
             <Grid.ColumnDefinitions>
@@ -169,6 +170,22 @@
                                     <DataGridTextColumn Header="Atual" Binding="{Binding Current, Mode=OneWay}" Width="110"/>
                                     <DataGridTextColumn Header="Pior" Binding="{Binding Worst, Mode=OneWay}" Width="90"/>
                                     <DataGridTextColumn Header="Valor bruto" Binding="{Binding Raw, Mode=OneWay}" Width="150"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Text="Histórico SMART" Style="{StaticResource H2}"/>
+                            <TextBlock x:Name="HistoryStatus" Style="{StaticResource Muted}" Margin="0,4,0,8" TextWrapping="Wrap"/>
+                            <DataGrid x:Name="HistoryGrid" MaxHeight="260">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Leitura" Binding="{Binding DateText, Mode=OneWay}" Width="*"/>
+                                    <DataGridTextColumn Header="Vida usada" Binding="{Binding WearText, Mode=OneWay}" Width="90"/>
+                                    <DataGridTextColumn Header="Erros de mídia" Binding="{Binding MediaErrors, Mode=OneWay, TargetNullValue=—}" Width="110"/>
+                                    <DataGridTextColumn Header="Realocados" Binding="{Binding Reallocated, Mode=OneWay, TargetNullValue=—}" Width="90"/>
+                                    <DataGridTextColumn Header="Pendentes" Binding="{Binding Pending, Mode=OneWay, TargetNullValue=—}" Width="85"/>
+                                    <DataGridTextColumn Header="Incorrigíveis" Binding="{Binding Uncorrectable, Mode=OneWay, TargetNullValue=—}" Width="100"/>
                                 </DataGrid.Columns>
                             </DataGrid>
                         </StackPanel>

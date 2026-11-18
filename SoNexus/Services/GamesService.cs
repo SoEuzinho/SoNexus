@@ -9,7 +9,7 @@ using SoNexus.Models;
 
 namespace SoNexus.Services;
 
-/// <summary>Requisitos de um jogo (vindos da loja Steam) guardados em cache.</summary>
+/// <summary>Referências da loja Steam ou da tabela local guardadas em cache.</summary>
 public sealed class GameRequirements
 {
     public int SteamId { get; set; }
@@ -22,6 +22,7 @@ public sealed class GameRequirements
     public bool VrOnly { get; set; }
     public string? Image { get; set; }
     public string RecText { get; set; } = "";
+    public string Source { get; set; } = "";
     public bool Light { get; set; }
     public DateTime Fetched { get; set; }
 }
@@ -66,13 +67,15 @@ public sealed record PcProfile(
 {
     public string Resolution => $"{Width}x{Height}";
     public double PixelFactor => Width * Height / (1920.0 * 1080);
+    public bool GpuScoreKnown { get; init; } = true;
+    public bool CpuScoreKnown { get; init; } = true;
 }
 
 /// <summary>GpuUse/CpuUse: quanto cada peça fica ocupada (%). Lost: quanto a peça mais forte desperdiça (%).</summary>
 public sealed record Bottleneck(string Resolution, string Limit, string Text, double GpuUse, double CpuUse, double Lost)
 {
-    public string GpuUseText => $"Placa {GpuUse:0}%";
-    public string CpuUseText => $"Processador {CpuUse:0}%";
+    public string GpuUseText => $"GPU no modelo: {GpuUse:0}%";
+    public string CpuUseText => $"CPU no modelo: {CpuUse:0}%";
 }
 
 /// <summary>Problema encontrado num jogo ou no PC que atrapalha jogar.</summary>
@@ -80,7 +83,7 @@ public sealed record GameProblem(string Title, string Detail, string Severity);
 
 public sealed record PcTip(string Title, string Detail, string Impact, Func<Task<string?>>? Fix);
 
-/// <summary>Biblioteca de jogos de todos os launchers e estimativa de desempenho para o seu PC.</summary>
+/// <summary>Biblioteca de jogos de launchers compatíveis e estimativa de desempenho para o PC.</summary>
 public static partial class GamesService
 {
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(12) };
@@ -307,7 +310,7 @@ public static partial class GamesService
 
     // ---------- Requisitos (loja Steam) ----------
 
-    // Jogos fora da Steam: requisitos recomendados oficiais (placa, processador).
+    // Referências locais para títulos conhecidos sem ID Steam.
     private static readonly Dictionary<string, (string Gpu, string Cpu, bool Light)> KnownGames = new(StringComparer.OrdinalIgnoreCase)
     {
         ["VALORANT"] = ("GTX 1050 Ti", "i3-4150", true),
@@ -358,16 +361,16 @@ public static partial class GamesService
     {
         var key = game.SteamId?.ToString() ?? game.Name.ToLowerInvariant();
         lock (Cache())
-            if (Cache().TryGetValue(key, out var cached) && (DateTime.Now - cached.Fetched).TotalDays < 30) return cached;
+            if (Cache().TryGetValue(key, out var cached) && !string.IsNullOrWhiteSpace(cached.Source)
+                && (DateTime.Now - cached.Fetched).TotalDays < 30) return cached;
 
         GameRequirements? req = null;
-        var known = KnownGames.FirstOrDefault(k => game.Name.StartsWith(k.Key, StringComparison.OrdinalIgnoreCase));
-        if (known.Key != null)
+        if (game.SteamId == null && KnownGames.TryGetValue(game.Name.Trim(), out var known))
         {
             req = new GameRequirements
             {
-                RecGpu = PerformanceTables.GpuScore(known.Value.Gpu), RecCpu = PerformanceTables.CpuScore(known.Value.Cpu),
-                Light = known.Value.Light, RecText = $"Placa recomendada: {known.Value.Gpu}", Fetched = DateTime.Now,
+                RecGpu = PerformanceTables.GpuScore(known.Gpu), RecCpu = PerformanceTables.CpuScore(known.Cpu),
+                Light = known.Light, RecText = known.Gpu, Source = "Tabela local do SoNexus", Fetched = DateTime.Now,
             };
         }
         else
@@ -392,7 +395,12 @@ public static partial class GamesService
             var url = $"https://store.steampowered.com/api/storesearch/?term={Uri.EscapeDataString(name)}&l=english&cc=BR";
             using var doc = JsonDocument.Parse(await Http.GetStringAsync(url));
             var items = doc.RootElement.GetProperty("items");
-            return items.GetArrayLength() > 0 ? items[0].GetProperty("id").GetInt32() : null;
+            var ids = items.EnumerateArray()
+                .Where(item => item.TryGetProperty("name", out var title) &&
+                    string.Equals(title.GetString()?.Trim(), name.Trim(), StringComparison.OrdinalIgnoreCase))
+                .Select(item => item.GetProperty("id").GetInt32())
+                .Distinct().Take(2).ToList();
+            return ids.Count == 1 ? ids[0] : null;
         }
         catch
         {
@@ -408,6 +416,7 @@ public static partial class GamesService
             var root = doc.RootElement.GetProperty(id.ToString());
             if (!root.GetProperty("success").GetBoolean()) return null;
             var data = root.GetProperty("data");
+            if (!data.TryGetProperty("type", out var type) || type.GetString() != "game") return null;
             string Req(string which)
             {
                 if (!data.TryGetProperty("pc_requirements", out var pc) || pc.ValueKind != JsonValueKind.Object) return "";
@@ -425,6 +434,7 @@ public static partial class GamesService
             return new GameRequirements
             {
                 SteamId = id,
+                Source = $"Loja Steam · App {id}",
                 RecGpu = recGpu.Count > 0 ? (int)recGpu.Average() : null,
                 MinGpu = minGpu.Count > 0 ? (int)minGpu.Average() : null,
                 RecCpu = recCpu.Count > 0 ? (int)recCpu.Average() : null,
@@ -434,7 +444,6 @@ public static partial class GamesService
                 VrOnly = categories.Any(c => c.Contains("VR Only", StringComparison.OrdinalIgnoreCase)),
                 Image = data.TryGetProperty("header_image", out var img) ? img.GetString() : null,
                 RecText = Section(rec.Length > 0 ? rec : min, "Graphics").Trim(),
-                Light = recGpu.Count == 0 && minGpu.Count == 0,
                 Fetched = DateTime.Now,
             };
         }
@@ -468,11 +477,14 @@ public static partial class GamesService
         if (ram == 0) ram = MemoryService.GetStatus().Total; // máquina virtual / BIOS sem a tabela dos pentes
         var steamDisk = StorageTypeFor(SteamLibraries().FirstOrDefault());
 
-        // Peça fora da tabela: valor conservador pela marca, em vez de fingir que é uma placa média.
-        var gpuScore = PerformanceTables.GpuScore(gpuName) ?? (main?.Vendor switch { "NVIDIA" => 90, "AMD" => 70, "Intel" => 20, _ => 40 });
-        var cpuScore = PerformanceTables.CpuScore(cpuName) ?? Math.Clamp(Environment.ProcessorCount * 9, 30, 120);
-        return new PcProfile(gpuName, gpuScore, cpuName, cpuScore,
-            ram, Math.Max(1, layout.Modules.Count), (int)layout.Speed, w, h, hz, maxHz, steamDisk);
+        var gpuScore = PerformanceTables.GpuScore(gpuName);
+        var cpuScore = PerformanceTables.CpuScore(cpuName);
+        return new PcProfile(gpuName, gpuScore ?? 0, cpuName, cpuScore ?? 0,
+            ram, Math.Max(1, layout.Modules.Count), (int)layout.Speed, w, h, hz, maxHz, steamDisk)
+        {
+            GpuScoreKnown = gpuScore.HasValue,
+            CpuScoreKnown = cpuScore.HasValue,
+        };
     }
 
     public static int PrimaryRefreshHz() => PrimaryDisplay().Hz;
@@ -612,19 +624,21 @@ public static partial class GamesService
     public static void Estimate(Game game, PcProfile pc)
     {
         var r = game.Requirements;
-        if (r == null)
+        if (r == null || !pc.GpuScoreKnown || !pc.CpuScoreKnown || (r.RecGpu == null && r.MinGpu == null))
         {
             game.Estimate = "Sem dados";
             game.Verdict = "";
-            game.Detail = "Não achamos os requisitos deste jogo na loja Steam.";
+            game.Quality = "";
+            game.Detail = r == null ? "Requisitos indisponíveis."
+                : !pc.GpuScoreKnown || !pc.CpuScoreKnown ? "Hardware sem referência na tabela."
+                : $"GPU dos requisitos sem referência na tabela. {r.Source}";
             game.Order = 8;
             return;
         }
         double fpsGpu;
         if (r.RecGpu is { } rec) fpsGpu = 60 * Math.Pow((double)pc.GpuScore / rec, 0.9);
         // Muitos jogos só publicam o "mínimo", que na prática costuma rodar ~45 FPS no Médio.
-        else if (r.MinGpu is { } min) fpsGpu = 45 * Math.Pow((double)pc.GpuScore / min, 0.9) / 1.3;
-        else fpsGpu = 60 * Math.Pow(pc.GpuScore / 60.0, 0.9); // jogo leve (requisito sem placa específica)
+        else fpsGpu = 45 * Math.Pow((double)pc.GpuScore / r.MinGpu!.Value, 0.9) / 1.3;
 
         // Jogo só de VR: os requisitos já são para os óculos (mínimo ≈ 80 FPS, recomendado ≈ 90 FPS em VR).
         if (r.VrOnly)
@@ -635,7 +649,7 @@ public static partial class GamesService
             game.Estimate = $"~{vr:0} FPS em VR";
             game.Quality = vr >= 120 ? "Ultra em VR" : vr >= 90 ? "Alto em VR" : vr >= 72 ? "Médio em VR" : "Baixo em VR";
             (game.Verdict, game.Order) = vr >= 90 ? ("Roda liso em VR", 4) : vr >= 72 ? ("Roda bem em VR", 3) : ("Pesado em VR", 1);
-            game.Detail = "Jogo só de VR (Virtual Desktop/SteamVR)." + (r.RecText.Length > 0 ? $" Placa: {Short(r.RecText)}" : "");
+            game.Detail = $"{r.Source} · Estimativa para VR" + (r.RecText.Length > 0 ? $" · GPU: {Short(r.RecText)}" : "");
             return;
         }
 
@@ -670,12 +684,14 @@ public static partial class GamesService
             >= 25 => ("Pesado", 1),
             _ => ("Muito pesado", 0),
         };
-        var notes = new List<string>();
-        if (cpuLimited && fps < 200) notes.Add("limitado pelo processador");
+        var notes = new List<string> { r.Source };
+        if (cpuLimited && fps < 200) notes.Add("possível limite na CPU");
+        if (r.RecCpu == null) notes.Add("CPU de referência genérica");
         if (r.RecRamGb is { } ram && pc.RamBytes / (1L << 30) + 1 < (ulong)ram) notes.Add($"pede {ram} GB de RAM");
         if (r.SsdRequired && pc.GamesDiskType.Contains("HDD", StringComparison.OrdinalIgnoreCase)) notes.Add("exige SSD");
         if (r.VrOnly) notes.Add("só em VR");
-        game.Detail = (r.RecText.Length > 0 ? $"Recomendado: {Short(r.RecText)}" : "Jogo leve") + (notes.Count > 0 ? " · " + string.Join(" · ", notes) : "");
+        if (r.RecText.Length > 0) notes.Add($"GPU de referência: {Short(r.RecText)}");
+        game.Detail = string.Join(" · ", notes);
     }
 
     private static string Short(string s) => s.Length > 80 ? s[..80] + "..." : s;
@@ -688,6 +704,7 @@ public static partial class GamesService
     public static List<Bottleneck> Bottlenecks(PcProfile pc)
     {
         var list = new List<Bottleneck>();
+        if (!pc.GpuScoreKnown || !pc.CpuScoreKnown) return list;
         var cpuFps = 75 * Math.Pow(pc.CpuScore / 80.0, 1.1) * (pc.RamSticks == 1 ? 0.88 : 1);
         foreach (var (res, pixels) in new[] { ("1080p", 1.0), ("1440p", 1.78), ("4K", 4.0) })
         {
@@ -696,24 +713,23 @@ public static partial class GamesService
             var gpuUse = Math.Min(99, fps / gpuFps * 99);
             var cpuUse = Math.Min(100, fps / cpuFps * 100);
             var lost = (1 - Math.Min(gpuFps, cpuFps) / Math.Max(gpuFps, cpuFps)) * 100;
-            var numbers = $"Num jogo pesado: a placa desenharia ~{gpuFps:0} FPS e o processador prepararia ~{cpuFps:0} FPS; você vê ~{fps:0}.";
+            var numbers = $"Neste cenário, o modelo estima ~{gpuFps:0} FPS pela GPU, ~{cpuFps:0} pela CPU e ~{fps:0} FPS combinados.";
 
             string limit, advice;
             if (cpuFps < gpuFps * 0.85)
             {
                 limit = "Processador";
-                advice = $"A placa de vídeo fica ~{100 - gpuUse:0}% parada esperando o processador. Subir gráficos/resolução quase não tira FPS; " +
-                         (pc.RamSticks == 1 ? "colocar o 2º pente de RAM (dual channel) ajuda; " : "") + "trocar o processador dá o maior ganho.";
+                advice = "A CPU tem o menor teto no modelo.";
             }
             else if (gpuFps < cpuFps * 0.85)
             {
                 limit = "Placa de vídeo";
-                advice = "Este é o cenário normal e saudável: a placa trabalha a 99%. Para mais FPS, baixe sombras/efeitos ou ative DLSS/FSR.";
+                advice = "A GPU tem o menor teto no modelo.";
             }
             else
             {
                 limit = "Equilibrado";
-                advice = "Processador e placa estão no mesmo nível: nenhum dos dois desperdiça o outro.";
+                advice = "Os tetos da CPU e da GPU ficam próximos neste modelo.";
             }
             list.Add(new Bottleneck(res, limit, $"{numbers} {advice}", gpuUse, cpuUse, lost));
         }

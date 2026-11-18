@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using LibreHardwareMonitor.Hardware;
 using SoNexus.Models;
 
@@ -9,7 +10,7 @@ public sealed record SensorReading(
 
 /// <summary>
 /// Lê todos os sensores (temperatura, uso, consumo, clocks, ventoinhas...) via LibreHardwareMonitor
-/// uma vez por segundo e publica um snapshot imutável.
+/// no intervalo configurado e publica um snapshot imutável.
 /// </summary>
 public sealed class HardwareService : IDisposable
 {
@@ -26,9 +27,12 @@ public sealed class HardwareService : IDisposable
     };
 
     private readonly object _hwLock = new();
+    private readonly object _timerLock = new();
     private Timer? _timer;
     private int _busy;
-    private volatile IReadOnlyList<SensorReading> _readings = Array.Empty<SensorReading>();
+    private bool _disposed;
+    private sealed record Snapshot(IReadOnlyList<SensorReading> Readings, long Timestamp);
+    private volatile Snapshot _snapshot = new(Array.Empty<SensorReading>(), 0);
 
     private HardwareService() { }
 
@@ -36,42 +40,93 @@ public sealed class HardwareService : IDisposable
 
     public bool IsRunning { get; private set; }
     public string? Error { get; private set; }
-    public IReadOnlyList<SensorReading> Readings => _readings;
+    public IReadOnlyList<SensorReading> Readings => _snapshot.Readings;
+
+    internal IReadOnlyList<SensorReading> FreshReadings
+    {
+        get
+        {
+            var snapshot = _snapshot;
+            int period;
+            lock (_timerLock) period = PollPeriod;
+            return snapshot.Timestamp != 0 && Stopwatch.GetElapsedTime(snapshot.Timestamp).TotalMilliseconds <= 2 * period + 1000
+                ? snapshot.Readings : Array.Empty<SensorReading>();
+        }
+    }
 
     public void Start()
     {
-        if (IsRunning) return;
-        try
+        lock (_hwLock)
         {
-            _computer.Open();
-            IsRunning = true;
+            if (IsRunning || _disposed) return;
+            try
+            {
+                _computer.Open();
+                IsRunning = true;
+                lock (_timerLock)
+                    _timer = new Timer(_ => Tick(), null, 0, PollPeriod);
+            }
+            catch (Exception ex)
+            {
+                Error = ex.Message;
+            }
         }
-        catch (Exception ex)
-        {
-            Error = ex.Message;
-            Updated?.Invoke(this, EventArgs.Empty);
-            return;
-        }
-        _timer = new Timer(_ => Tick(), null, 0, _interval);
+        if (Error != null) Updated?.Invoke(this, EventArgs.Empty);
     }
 
     private int _interval = 1000;
+    private bool _minimized;
+    private bool _batterySaver;
+    private int PollPeriod => _minimized || _batterySaver ? Math.Max(5000, _interval) : _interval;
 
     /// <summary>De quanto em quanto tempo os sensores são lidos (Integração › Sistema).</summary>
     public int IntervalMs
     {
-        get => _interval;
         set
         {
-            _interval = Math.Clamp(value, 500, 10000);
-            _timer?.Change(_interval, _interval);
+            lock (_timerLock)
+            {
+                var previous = PollPeriod;
+                _interval = Math.Clamp(value, 500, 10000);
+                UpdatePeriod(previous);
+            }
         }
     }
 
-    /// <summary>Com a janela minimizada, lê os sensores a cada 5 s em vez de 1 s.</summary>
-    public bool Minimized { get; set; }
+    public bool Minimized
+    {
+        set
+        {
+            lock (_timerLock)
+            {
+                var previous = PollPeriod;
+                _minimized = value;
+                UpdatePeriod(previous);
+            }
+        }
+    }
 
-    private long _tick;
+    public bool BatterySaver
+    {
+        set
+        {
+            lock (_timerLock)
+            {
+                var previous = PollPeriod;
+                _batterySaver = value;
+                UpdatePeriod(previous);
+            }
+        }
+    }
+
+    private void UpdatePeriod(int previous)
+    {
+        var period = PollPeriod;
+        if (period != previous)
+            _timer?.Change(period < previous ? 0 : period, period);
+    }
+
+    private long? _lastStorageUpdate;
 
     private void Tick()
     {
@@ -79,17 +134,18 @@ public sealed class HardwareService : IDisposable
         if (Interlocked.Exchange(ref _busy, 1) == 1) return;
         try
         {
-            var tick = _tick++;
-            if (Minimized && tick % 5 != 0) return;
             // Discos (SMART) são lentos de ler e mudam pouco: só a cada 5 s.
-            var updateStorage = tick % 5 == 0;
+            var now = Stopwatch.GetTimestamp();
+            var updateStorage = _lastStorageUpdate is not { } last || Stopwatch.GetElapsedTime(last, now) >= TimeSpan.FromSeconds(5);
 
-            var list = new List<SensorReading>(_readings.Count + 16);
+            var list = new List<SensorReading>(Readings.Count + 16);
             lock (_hwLock)
             {
+                if (_disposed) return;
                 foreach (var hw in _computer.Hardware) Collect(hw, list, updateStorage);
             }
-            _readings = list;
+            if (updateStorage) _lastStorageUpdate = now;
+            _snapshot = new Snapshot(list, Stopwatch.GetTimestamp());
             Error = null; // uma falha passageira não deixa o aviso de erro preso na tela
             Updated?.Invoke(this, EventArgs.Empty);
         }
@@ -113,17 +169,27 @@ public sealed class HardwareService : IDisposable
 
     public void Dispose()
     {
-        _timer?.Dispose();
-        SpinWait.SpinUntil(() => Volatile.Read(ref _busy) == 0, 2000);
-        try { if (IsRunning) _computer.Close(); } catch { }
-        IsRunning = false;
+        lock (_hwLock)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            lock (_timerLock)
+            {
+                _timer?.Dispose();
+                _timer = null;
+            }
+            try { if (IsRunning) _computer.Close(); }
+            catch (Exception ex) { AppLog.Write($"Não foi possível fechar os sensores: {ex.Message}"); }
+            IsRunning = false;
+        }
     }
 
     /// <summary>Acesso direto aos objetos do hardware (ex.: SMART dos discos) sem brigar com a leitura periódica.</summary>
     public T WithHardware<T>(Func<IReadOnlyList<IHardware>, T> read)
     {
         if (!IsRunning) return read(Array.Empty<IHardware>());
-        lock (_hwLock) return read(_computer.Hardware.ToList());
+        lock (_hwLock)
+            return read(IsRunning ? _computer.Hardware.ToList() : Array.Empty<IHardware>());
     }
 
     // ---------- Controle de ventoinhas ----------
@@ -135,6 +201,7 @@ public sealed class HardwareService : IDisposable
         if (!IsRunning) return result;
         lock (_hwLock)
         {
+            if (!IsRunning) return result;
             void Walk(IHardware hw)
             {
                 var sensors = hw.Sensors;
@@ -156,6 +223,7 @@ public sealed class HardwareService : IDisposable
     {
         lock (_hwLock)
         {
+            if (_disposed) return;
             if (percent is { } p) control.SetSoftware(p);
             else control.SetDefault();
         }
@@ -172,6 +240,25 @@ public sealed class HardwareService : IDisposable
                 Find(r, gpu, SensorType.Power, true, "GPU Package", "GPU Power", "GPU Total")?.Value,
                 Find(r, gpu, SensorType.Clock, true, "GPU Core")?.Value);
     }
+
+    internal static bool IsGpu(HardwareType type) =>
+        type is HardwareType.GpuNvidia or HardwareType.GpuAmd or HardwareType.GpuIntel;
+
+    /// <summary>Localiza as leituras do modelo de GPU que o teste abriu no DXGI.</summary>
+    internal static IEnumerable<SensorReading> TestGpuReadings(IReadOnlyList<SensorReading> readings, string adapterName)
+    {
+        static string Normalize(string name) => string.Join(' ',
+            name.Replace("(R)", "", StringComparison.OrdinalIgnoreCase)
+                .Replace("(TM)", "", StringComparison.OrdinalIgnoreCase)
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries));
+        var name = Normalize(adapterName);
+        return readings.Where(r => IsGpu(r.HardwareType) && Normalize(r.Hardware).Equals(name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    internal static float? TestGpuTemp(IEnumerable<SensorReading> readings) =>
+        readings.Where(r => r.Type == SensorType.Temperature && r.Value is > 0 and < 150)
+            .Select(r => r.Value)
+            .Max();
 
     public static bool IsCpu(HardwareType t) => t == HardwareType.Cpu;
 

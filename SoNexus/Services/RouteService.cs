@@ -142,13 +142,17 @@ public static class RouteService
         var buffer = new byte[32];
         using (var ping = new Ping())
         {
-            for (var ttl = 1; ttl <= 30 && !ct.IsCancellationRequested; ttl++)
+            for (var ttl = 1; ttl <= 30; ttl++)
             {
+                ct.ThrowIfCancellationRequested();
                 PingReply? reply = null;
                 for (var attempt = 0; attempt < 2 && reply?.Address == null; attempt++)
                 {
-                    try { reply = await ping.SendPingAsync(address, 1500, buffer, new PingOptions(ttl, true)); }
-                    catch { }
+                    try
+                    {
+                        reply = await ping.SendPingAsync(address, TimeSpan.FromMilliseconds(1500), buffer, new PingOptions(ttl, true), ct);
+                    }
+                    catch (PingException) { }
                 }
                 var ip = reply?.Address?.ToString();
                 var reached = reply?.Status == IPStatus.Success;
@@ -168,24 +172,32 @@ public static class RouteService
                 }
             }
         }
+        ct.ThrowIfCancellationRequested();
         if (hops.LastOrDefault()?.Ip != address.ToString())
             hops.Add(new RouteHop { Hop = hops.Count + 1, Ip = address.ToString(), TcpFallback = true });
         Label(hops);
         onHops(hops);
 
         // Nomes (DNS reverso) em paralelo: ajudam a ver qual é o provedor e em que cidade passa.
-        _ = Task.WhenAll(hops.Where(h => h.Ip != "*").Select(async h =>
+        if (AppSettings.Current.AllowOnline)
         {
-            try { h.Host = (await Dns.GetHostEntryAsync(h.Ip, ct)).HostName; } catch { }
-        }));
+            _ = Task.WhenAll(hops.Where(h => h.Ip != "*").Select(async h =>
+            {
+                var host = await NetworkService.HostNameAsync(h.Ip);
+                if (!ct.IsCancellationRequested) h.Host = host;
+            }));
+        }
 
-        for (var r = 0; r < rounds && !ct.IsCancellationRequested; r++)
+        for (var r = 0; r < rounds; r++)
         {
+            ct.ThrowIfCancellationRequested();
             await Task.WhenAll(hops.Where(h => h.Ip != "*").Select(async h =>
             {
-                h.Add(h.TcpFallback ? await TcpPingAsync(h.Ip, port, ct) : await PingOnceAsync(h.Ip));
+                var time = h.TcpFallback ? await TcpPingAsync(h.Ip, port, ct) : await PingOnceAsync(h.Ip, ct);
+                ct.ThrowIfCancellationRequested();
+                h.Add(time);
             }));
-            await Task.Delay(500, ct).ContinueWith(_ => { });
+            if (r < rounds - 1) await Task.Delay(500, ct);
         }
     }
 
@@ -198,15 +210,15 @@ public static class RouteService
         }
     }
 
-    private static async Task<double?> PingOnceAsync(string ip)
+    private static async Task<double?> PingOnceAsync(string ip, CancellationToken ct)
     {
         try
         {
             using var ping = new Ping();
-            var reply = await ping.SendPingAsync(ip, 1500);
+            var reply = await ping.SendPingAsync(IPAddress.Parse(ip), TimeSpan.FromMilliseconds(1500), cancellationToken: ct);
             return reply.Status == IPStatus.Success ? reply.RoundtripTime : null;
         }
-        catch
+        catch (PingException)
         {
             return null;
         }

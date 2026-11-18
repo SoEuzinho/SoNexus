@@ -13,12 +13,15 @@ public sealed class StressTest
 {
     private long _iterations;
     private long _errors;
+    private long _ramTested;
+    private int _ramAllocationFailures;
 
     public long Iterations => Interlocked.Read(ref _iterations);
     public long Errors => Interlocked.Read(ref _errors);
 
     /// <summary>Quantidade de RAM sendo testada no modo RAM.</summary>
-    public ulong RamTested { get; private set; }
+    public ulong RamTested => (ulong)Interlocked.Read(ref _ramTested);
+    public int RamAllocationFailures => Volatile.Read(ref _ramAllocationFailures);
 
     /// <summary>
     /// RAM: ocupa ~70% da memória livre, cada thread grava um padrão pseudoaleatório e lê de volta.
@@ -26,15 +29,18 @@ public sealed class StressTest
     /// </summary>
     public Task RunRamAsync(int threads, CancellationToken ct) => Task.Run(() =>
     {
+        if (ct.IsCancellationRequested) return;
         var free = MemoryService.GetStatus().Available;
         var perThread = (long)(free * 0.7 / (ulong)threads) / 8 * 8;
-        perThread = Math.Clamp(perThread, 16L << 20, 2L << 30);
-        RamTested = (ulong)(perThread * threads);
+        perThread = Math.Min(perThread, 2L << 30);
+        if (perThread == 0) return;
         var workers = Enumerable.Range(0, threads).Select(t => new Thread(() =>
         {
+            if (ct.IsCancellationRequested) return;
             ulong[] block;
             try { block = new ulong[perThread / 8]; }
-            catch (OutOfMemoryException) { return; }
+            catch (OutOfMemoryException) { Interlocked.Increment(ref _ramAllocationFailures); return; }
+            var firstPass = true;
             var seed = (ulong)(t + 1) * 0x9E3779B97F4A7C15;
             while (!ct.IsCancellationRequested)
             {
@@ -42,6 +48,7 @@ public sealed class StressTest
                 var x = seed;
                 for (var i = 0; i < block.Length; i++)
                 {
+                    if ((i & 0xFFFF) == 0 && ct.IsCancellationRequested) return;
                     x ^= x << 13; x ^= x >> 7; x ^= x << 17;
                     block[i] = x;
                 }
@@ -49,10 +56,16 @@ public sealed class StressTest
                 var wrong = 0;
                 for (var i = 0; i < block.Length; i++)
                 {
+                    if ((i & 0xFFFF) == 0 && ct.IsCancellationRequested) return;
                     x ^= x << 13; x ^= x >> 7; x ^= x << 17;
                     if (block[i] != x) wrong++;
                 }
                 if (wrong > 0) Interlocked.Add(ref _errors, wrong);
+                if (firstPass)
+                {
+                    Interlocked.Add(ref _ramTested, perThread);
+                    firstPass = false;
+                }
                 Interlocked.Increment(ref _iterations);
             }
         }) { IsBackground = true, Priority = ThreadPriority.BelowNormal }).ToList();

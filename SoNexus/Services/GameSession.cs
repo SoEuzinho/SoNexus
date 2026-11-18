@@ -3,7 +3,7 @@ using System.Text.Json;
 
 namespace SoNexus.Services;
 
-/// <summary>O que segurou o FPS num segundo de jogo (medido pelos sensores, não pela tabela).</summary>
+/// <summary>Sinais heurísticos observados nas amostras de FPS e sensores do sistema.</summary>
 public enum FrameLimit { Gpu, Cpu, Cap, Thermal, Vram, Ram, Other, Unknown }
 
 /// <summary>Um segundo de jogo: o que os sensores e o contador de quadros diziam.</summary>
@@ -26,8 +26,7 @@ public static class GameDiagnosis
         if (s.GpuLoad >= 95) return FrameLimit.Gpu;
         if (IsCapped(s.Fps, refreshHz) && s.GpuLoad < 90) return FrameLimit.Cap;
         if (s.CoreMax >= 90 && s.GpuLoad < 90) return FrameLimit.Cpu;
-        if (s.GpuLoad < 80) return FrameLimit.Other;
-        return FrameLimit.Gpu; // 80-95%: placa praticamente cheia
+        return FrameLimit.Other;
     }
 
     public static int? CapOf(double fps, int refreshHz) =>
@@ -39,7 +38,7 @@ public static class GameDiagnosis
     {
         FrameLimit.Gpu => "Placa de vídeo",
         FrameLimit.Cpu => "Processador",
-        FrameLimit.Cap => "Limitador / V-Sync",
+        FrameLimit.Cap => "Possível limite de FPS",
         FrameLimit.Thermal => "Temperatura",
         FrameLimit.Vram => "VRAM cheia",
         FrameLimit.Ram => "RAM cheia",
@@ -53,23 +52,20 @@ public static class GameDiagnosis
         var cap = CapOf(s.Fps, refreshHz);
         return l switch
         {
-            FrameLimit.Thermal => ("Esquentando demais", $"{(s.GpuTemp >= 87 ? $"Placa a {s.GpuTemp:0} °C" : $"Processador a {s.CpuTemp:0} °C")}: acima disso as peças baixam o clock sozinhas (thermal throttling) e o FPS cai. Limpe a poeira, melhore o fluxo de ar ou deixe as ventoinhas mais fortes."),
+            FrameLimit.Thermal => ("Temperatura alta", $"{(s.GpuTemp >= 87 ? $"Placa a {s.GpuTemp:0} °C" : $"Processador a {s.CpuTemp:0} °C")}. A temperatura merece atenção. O limite térmico depende do modelo e a leitura por si só não confirma redução de clock."),
             FrameLimit.Vram => ("Memória de vídeo cheia", $"A VRAM está em {s.VramPct:0}%. Quando enche, a placa usa a RAM do PC e aparecem engasgos. Baixe a qualidade das texturas."),
             FrameLimit.Ram => ("RAM do PC quase cheia", $"{s.RamPct}% da memória em uso: o Windows começa a usar o disco e o jogo engasga. Feche navegador e programas em segundo plano."),
             FrameLimit.Unknown => ("Sem sensor de uso da placa", "Sem o uso da placa de vídeo não dá para dizer quem segura o FPS. Abra o SoNexus como administrador para ler todos os sensores."),
-            FrameLimit.Gpu => ("Limite: placa de vídeo", $"A placa está trabalhando a {s.GpuLoad:0}%, o cenário normal em jogos pesados. Para mais FPS: baixe sombras, reflexos e efeitos, ou ative DLSS/FSR/XeSS."),
-            FrameLimit.Cap => ($"FPS travado em {cap}", cap == refreshHz
-                ? "É a taxa do monitor: V-Sync, G-Sync/FreeSync ou o limitador do jogo estão segurando. Isso é bom para fluidez."
-                : "Há um limitador de FPS ativo (no jogo, no painel da NVIDIA/AMD ou no RivaTuner). Tire-o se quiser mais FPS."),
-            FrameLimit.Cpu => ("Limite: processador", $"Um núcleo do processador está a {s.CoreMax:0}% e a placa está só a {s.GpuLoad:0}%: o processador não consegue preparar quadros mais rápido. Suba a resolução/gráficos (é \"de graça\"), feche programas em segundo plano."),
-            _ => ("Nem placa nem processador no limite", $"Placa a {s.GpuLoad:0}% e núcleo mais ocupado a {s.CoreMax:0}%. O motor do jogo, o servidor online, a leitura do disco ou um limitador estão segurando o FPS."),
+            FrameLimit.Gpu => ("Sinal de limite na GPU", $"O sensor da placa registra {s.GpuLoad:0}% de uso. Reduza um ajuste gráfico e compare o FPS na mesma cena para confirmar."),
+            FrameLimit.Cap => ($"FPS próximo de {cap}", "A amostra está perto de um limite comum. Confira o V-Sync e os limites de FPS do jogo e do driver."),
+            FrameLimit.Cpu => ("Sinal de limite na CPU", $"O núcleo mais ocupado do sistema registra {s.CoreMax:0}% e o sensor da placa, {s.GpuLoad:0}%. Compare a mesma cena e verifique também os processos em segundo plano."),
+            _ => ("Sem limite claro", $"O sensor da placa registra {s.GpuLoad:0}% de uso. As leituras desta amostra não isolam uma causa."),
         };
     }
 }
 
 /// <summary>
-/// Uma partida medida: soma, segundo a segundo, quem segurou o FPS. É isto que responde
-/// "o meu PC tem gargalo?" com dado real, em vez da estimativa por tabela.
+/// Resume a telemetria da partida e os sinais heurísticos observados.
 /// </summary>
 public sealed class GameSession
 {
@@ -82,6 +78,9 @@ public sealed class GameSession
     private readonly int[] _counts = new int[Enum.GetValues<FrameLimit>().Length];
     private double _fpsSum, _gpuSum, _coreSum;
     private int _gpuSamples;
+    private readonly Queue<SessionPoint> _timeline = new();
+    private SessionPoint? _bucket;
+    private int? _lastStutters;
     public float? MaxCpuTemp { get; private set; }
     public float? MaxGpuTemp { get; private set; }
     public double MaxVramPct { get; private set; }
@@ -89,7 +88,7 @@ public sealed class GameSession
 
     public GameSession(string game) => Game = game;
 
-    public void Add(GameSecond s, FrameLimit limit)
+    public void Add(GameSecond s, FrameLimit limit, int? cumulativeStutters = null)
     {
         if (s.Fps < 5) return; // jogo pausado, carregando ou minimizado
         Seconds++;
@@ -101,7 +100,28 @@ public sealed class GameSession
         if (s.GpuTemp > (MaxGpuTemp ?? 0)) MaxGpuTemp = s.GpuTemp;
         MaxVramPct = Math.Max(MaxVramPct, s.VramPct ?? 0);
         MaxRamPct = Math.Max(MaxRamPct, s.RamPct);
+
+        var stutters = cumulativeStutters is { } count && _lastStutters is { } last ? Math.Max(0, count - last) : (int?)null;
+        _lastStutters = cumulativeStutters;
+        _bucket = _bucket is { } previous
+            ? new(Seconds, Math.Min(previous.MinFps, s.Fps), Peak(previous.CpuTemp, s.CpuTemp),
+                Peak(previous.GpuTemp, s.GpuTemp), AddCounts(previous.Stutters, stutters))
+            : new(Seconds, s.Fps, s.CpuTemp, s.GpuTemp, stutters);
+        if (Seconds % 5 == 0)
+        {
+            if (_timeline.Count == 720) _timeline.Dequeue();
+            _timeline.Enqueue(_bucket);
+            _bucket = null;
+        }
     }
+
+    private static float? Peak(float? first, float? second) =>
+        first is { } a && second is { } b ? Math.Max(a, b) : first ?? second;
+
+    private static int? AddCounts(int? first, int? second) =>
+        first.HasValue || second.HasValue ? first.GetValueOrDefault() + second.GetValueOrDefault() : null;
+
+    public SessionPoint[] Timeline() => _bucket is { } point ? _timeline.Append(point).TakeLast(720).ToArray() : _timeline.ToArray();
 
     public double Share(FrameLimit l) => Seconds == 0 ? 0 : (double)_counts[(int)l] / Seconds;
     public double AvgFps => Seconds == 0 ? 0 : _fpsSum / Seconds;
@@ -124,26 +144,26 @@ public sealed class GameSession
         var ram = ramTips?.FirstOrDefault(t => t.Level >= HealthLevel.Warn);
         return main switch
         {
-            FrameLimit.Gpu => ($"A placa de vídeo foi o limite em {pct:0}% do tempo",
-                "É o normal e o saudável: o processador entrega quadros mais rápido do que a placa desenha, então nada está sobrando. " +
-                "Mais FPS: DLSS/FSR/XeSS, sombras e reflexos mais baixos. Trocar o processador não mudaria nada neste jogo."),
-            FrameLimit.Cpu => ($"O processador segurou o FPS em {pct:0}% do tempo",
-                $"Um núcleo ficou perto de 100% enquanto a placa sobrava (média {AvgGpu:0}%). Você tem um gargalo de processador neste jogo. " +
-                (ram != null ? $"Antes de trocar peça: {ram.Title.ToLowerInvariant()} — corrigir isso dá FPS de graça. " : "") +
-                "Feche programas em segundo plano; aumentar a resolução ou os gráficos não vai baixar o FPS (a placa tem folga)."),
-            FrameLimit.Cap => ($"O FPS ficou travado num limite em {pct:0}% do tempo",
-                "V-Sync, G-Sync/FreeSync ou um limitador seguraram o FPS de propósito. Não é gargalo: o PC aguenta mais. Tire o limite se quiser mais FPS."),
+            FrameLimit.Gpu => ($"Sinal de limite na GPU em {pct:0}% das amostras",
+                "A placa apresentou carga alta. Compare o FPS na mesma cena com um ajuste gráfico mais leve."),
+            FrameLimit.Cpu => ($"Sinal de limite na CPU em {pct:0}% das amostras",
+                $"Um núcleo do sistema ficou muito ocupado com folga na placa (média {AvgGpu:0}%). Compare a mesma cena com outros programas fechados." +
+                (ram != null ? $" Confira também: {ram.Title}." : "")),
+            FrameLimit.Cap => ($"FPS perto de limites comuns em {pct:0}% das amostras",
+                "Confira se o jogo ou o driver tem um limite de FPS ativo e compare de novo."),
             FrameLimit.Thermal => ($"Temperatura alta em {pct:0}% do tempo",
-                $"Máximas: processador {MaxCpuTemp:0} °C, placa {MaxGpuTemp:0} °C. Quente assim as peças reduzem o clock. Limpe a poeira e melhore a ventilação antes de qualquer outra coisa."),
+                $"Temperaturas máximas dos sensores: CPU {MaxCpuTemp?.ToString("0") ?? "—"} °C, GPU {MaxGpuTemp?.ToString("0") ?? "—"} °C. Confira os limites do seu hardware."),
             FrameLimit.Vram => ($"A memória da placa encheu em {pct:0}% do tempo", "Baixe a qualidade das texturas: com a VRAM cheia o jogo engasga mesmo com FPS alto."),
             FrameLimit.Ram => ($"A RAM do PC ficou cheia em {pct:0}% do tempo",
                 $"Pico de {MaxRamPct}% de uso. Feche o navegador e programas em segundo plano" + (ram != null ? $"; e veja: {ram.Title.ToLowerInvariant()}." : "; se acontece sempre, mais RAM resolve.")),
-            FrameLimit.Other => ($"Nem placa nem processador no limite em {pct:0}% do tempo",
-                $"Placa em média a {AvgGpu:0}% e núcleo mais ocupado a {AvgCore:0}%. O próprio jogo, o servidor online ou o disco seguram o FPS. Trocar peça não ajudaria."),
+            FrameLimit.Other => ($"Sem limite claro em {pct:0}% das amostras",
+                "A telemetria disponível não isolou uma causa para a taxa de quadros."),
             _ => ("Sem sensor de uso da placa", "Abra o SoNexus como administrador para ler o uso da placa e saber quem segura o FPS."),
         };
     }
 }
+
+public sealed record SessionPoint(int Second, double MinFps, float? CpuTemp, float? GpuTemp, int? Stutters);
 
 /// <summary>Partida salva para comparar depois (aba "Seu PC e gargalo").</summary>
 public sealed class SavedSession
@@ -156,13 +176,16 @@ public sealed class SavedSession
     public string Main { get; set; } = "";
     public double MainPct { get; set; }
     public string Title { get; set; } = "";
+    public SessionPoint[]? Timeline { get; set; }
 
     public string When => Date.ToString("dd/MM HH:mm");
+    public string ComparisonLabel => $"{Game} · {When}";
     public string Summary => $"{AvgFps:0} FPS médio" + (Low1 is { } l ? $" · 1% low {l:0}" : "") + $" · {TimeSpan.FromSeconds(Seconds):h\\:mm\\:ss}";
 }
 
 public static class SessionHistory
 {
+    private static readonly object Sync = new();
     private static readonly string FilePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SoNexus", "sessions.json");
 
@@ -182,17 +205,30 @@ public static class SessionHistory
     public static void Save(GameSession s, FpsStats? stats)
     {
         if (s.Seconds < GameSession.MinSeconds) return;
-        var list = Load();
-        list.Insert(0, new SavedSession
+        lock (Sync)
         {
-            Game = s.Game, Date = s.Started, Seconds = s.Seconds, AvgFps = stats?.AvgFps ?? s.AvgFps, Low1 = stats?.Low1,
-            Main = GameDiagnosis.Name(s.Main), MainPct = Math.Round(s.Share(s.Main) * 100), Title = s.Verdict().Title,
-        });
-        try
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(list.Take(30).ToList()));
+            var list = Load();
+            list.Insert(0, new SavedSession
+            {
+                Game = s.Game, Date = s.Started, Seconds = s.Seconds, AvgFps = stats?.AvgFps ?? s.AvgFps, Low1 = stats?.Low1,
+                Main = GameDiagnosis.Name(s.Main), MainPct = Math.Round(s.Share(s.Main) * 100), Title = s.Verdict().Title,
+                Timeline = s.Timeline(),
+            });
+            var temporary = $"{FilePath}.{Guid.NewGuid():N}.tmp";
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
+                File.WriteAllText(temporary, JsonSerializer.Serialize(list.Take(30).ToList()));
+                File.Move(temporary, FilePath, overwrite: true);
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write($"Não foi possível guardar o histórico de partidas: {ex.Message}");
+            }
+            finally
+            {
+                try { File.Delete(temporary); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+            }
         }
-        catch { }
     }
 }

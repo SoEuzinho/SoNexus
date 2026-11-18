@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using SoNexus.Models;
@@ -8,14 +9,14 @@ namespace SoNexus.Views;
 public partial class StorageView : UserControl
 {
     private CancellationTokenSource? _scan;
-    private bool _loaded;
+    private long? _lastLoad;
+    private Dictionary<DiskHealth, List<SmartSample>> _history = new();
 
     public StorageView() => InitializeComponent();
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
-        if (_loaded) return;
-        _loaded = true;
+        if (_lastLoad is { } last && Stopwatch.GetElapsedTime(last) < SmartHistory.SampleInterval) return;
         await LoadAsync();
     }
 
@@ -23,10 +24,39 @@ public partial class StorageView : UserControl
 
     private async Task LoadAsync()
     {
+        if (!ReloadButton.IsEnabled) return;
+        ReloadButton.IsEnabled = ScanBar.IsEnabled = false;
         var selected = (DiskList.SelectedItem as DiskHealth)?.Index;
-        var disks = await Task.Run(StorageService.Disks);
-        DiskList.ItemsSource = disks;
-        DiskList.SelectedItem = disks.FirstOrDefault(d => d.Index == selected) ?? disks.OrderByDescending(d => d.Verdict != "Saudável").FirstOrDefault();
+        try
+        {
+            var (disks, history, error) = await Task.Run(() =>
+            {
+                var current = StorageService.Disks();
+                try { return (current, SmartHistory.Record(current), (string?)null); }
+                catch (Exception ex)
+                {
+                    AppLog.Write($"Histórico SMART: {ex.Message}");
+                    return (current, new Dictionary<DiskHealth, List<SmartSample>>(), "Não foi possível salvar ou ler o histórico SMART.");
+                }
+            });
+            _history = history;
+            DiskList.ItemsSource = disks;
+            DiskList.SelectedItem = disks.FirstOrDefault(d => d.Index == selected) ??
+                disks.OrderByDescending(d => d.Verdict != "Saudável").FirstOrDefault();
+            Detail.Visibility = disks.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            LoadStatus.Text = error ?? (disks.Count == 0 ? "Nenhum disco encontrado." : "");
+            LoadStatus.Visibility = LoadStatus.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+            _lastLoad = Stopwatch.GetTimestamp();
+        }
+        catch (Exception ex)
+        {
+            LoadStatus.Text = $"Não foi possível consultar o armazenamento: {ex.Message}";
+            LoadStatus.Visibility = Visibility.Visible;
+        }
+        finally
+        {
+            ReloadButton.IsEnabled = ScanBar.IsEnabled = true;
+        }
     }
 
     private void Disk_Selected(object sender, SelectionChangedEventArgs e)
@@ -65,10 +95,25 @@ public partial class StorageView : UserControl
         foreach (var v in d.Volumes) info.Add(new InfoItem("Partição", v));
         InfoList.ItemsSource = info;
         SmartGrid.ItemsSource = d.Smart;
+        UpdateHistory(d);
 
         BadGrid.Visibility = Visibility.Collapsed;
         ScanProgressBar.Value = 0;
         ScanStatus.Text = "";
+    }
+
+    private void UpdateHistory(DiskHealth disk)
+    {
+        _history.TryGetValue(disk, out var samples);
+        HistoryGrid.ItemsSource = samples;
+        HistoryGrid.Visibility = samples is { Count: > 0 } ? Visibility.Visible : Visibility.Collapsed;
+        var increased = samples is { Count: > 1 } && samples[0].HasNewErrorsSince(samples[1]);
+        HistoryStatus.Text = increased
+            ? "Os contadores de erros ou setores problemáticos aumentaram desde a leitura anterior."
+            : samples is { Count: > 0 }
+                ? "Até 30 dias. Abrir ou atualizar esta tela salva uma leitura por disco a cada 6 horas."
+                : "Sem histórico. É preciso identificar o disco e obter dados de desgaste ou erros pelo SMART.";
+        HistoryStatus.Foreground = increased ? Metric.Warn : (System.Windows.Media.Brush)FindResource("MutedBrush");
     }
 
     private async void QuickScan_Click(object sender, RoutedEventArgs e) => await ScanAsync(full: false);
@@ -83,6 +128,7 @@ public partial class StorageView : UserControl
                 "SoNexus", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
 
         _scan = new CancellationTokenSource();
+        ReloadButton.IsEnabled = false;
         ScanBar.Visibility = Visibility.Collapsed;
         StopButton.Visibility = Visibility.Visible;
         DiskList.IsEnabled = false;
@@ -116,5 +162,6 @@ public partial class StorageView : UserControl
         ScanBar.Visibility = Visibility.Visible;
         StopButton.Visibility = Visibility.Collapsed;
         DiskList.IsEnabled = true;
+        ReloadButton.IsEnabled = true;
     }
 }

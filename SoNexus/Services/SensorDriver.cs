@@ -49,11 +49,7 @@ public static class SensorDriver
     /// <summary>Reabre o SoNexus para os sensores carregarem com o driver novo.</summary>
     public static void RestartApp()
     {
-        // Solta a trava de cópia única antes, senão a cópia nova só "acordaria" esta e fecharia.
-        ((App)System.Windows.Application.Current).ReleaseInstance();
-        if (Environment.ProcessPath is { } exe)
-            Process.Start(new ProcessStartInfo(exe) { UseShellExecute = true });
-        App.ExitCompletely();
+        ((App)System.Windows.Application.Current).Restart();
     }
 }
 

@@ -37,6 +37,11 @@ public partial class HardwareBenchView : UserControl
 
     private async Task RunAsync(bool gpu, bool ram, bool disk)
     {
+        if (!HardwareTest.Slot.Wait(0))
+        {
+            PhaseText.Text = "Aguarde o teste de hardware em andamento terminar.";
+            return;
+        }
         _cts = new CancellationTokenSource();
         var ct = _cts.Token;
         StartBar.Visibility = Visibility.Collapsed;
@@ -53,6 +58,10 @@ public partial class HardwareBenchView : UserControl
         {
             PhaseText.Text = "Cancelado";
         }
+        catch (HardwareTestSafetyException ex)
+        {
+            PhaseText.Text = $"Parado por segurança: {ex.Message}.";
+        }
         catch (Exception ex)
         {
             PhaseText.Text = $"Erro: {ex.Message}";
@@ -60,14 +69,20 @@ public partial class HardwareBenchView : UserControl
         }
         finally
         {
+            _cts.Dispose();
+            _cts = null;
             _timer.Stop();
             _live = null;
             LiveText.Text = "";
             PhaseBar.Value = 0;
-            _gpu?.Dispose();
-            _gpu = null;
-            StartBar.Visibility = Visibility.Visible;
-            StopButton.Visibility = Visibility.Collapsed;
+            try { _gpu?.Dispose(); }
+            finally
+            {
+                _gpu = null;
+                StartBar.Visibility = Visibility.Visible;
+                StopButton.Visibility = Visibility.Collapsed;
+                HardwareTest.Slot.Release();
+            }
         }
     }
 
@@ -89,7 +104,9 @@ public partial class HardwareBenchView : UserControl
         var rates = new List<double>();
         _live = () =>
         {
-            var (t, load, p, _) = HardwareService.GpuNow(HardwareService.Instance.Readings);
+            var readings = HardwareService.TestGpuReadings(HardwareService.Instance.FreshReadings, _gpu.AdapterName).ToArray();
+            var t = HardwareService.TestGpuTemp(readings);
+            var (_, load, p, _) = HardwareService.GpuNow(readings);
             if (_gpu.Rate > 0) rates.Add(_gpu.Rate);
             return $"{_gpu.Rate / 1000:0.0} TFLOPS" + (t is { } x ? $" · {x:0} °C" : "") + (p is { } w ? $" · {w:0} W" : "") + (load is { } l ? $" · {l:0}%" : "");
         };

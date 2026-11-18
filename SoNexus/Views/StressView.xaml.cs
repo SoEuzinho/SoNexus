@@ -12,7 +12,7 @@ public partial class StressView : UserControl
 {
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(1) };
     private StressTest? _test;
-    private GpuTester? _gpu;
+    private volatile GpuTester? _gpu;
     private StressMode _mode;
     private CancellationTokenSource? _cts;
     private Stopwatch _clock = new();
@@ -30,9 +30,6 @@ public partial class StressView : UserControl
         _timer.Tick += (_, _) => Tick();
     }
 
-    /// <summary>Stress em andamento (o Teste completo espera ele parar).</summary>
-    public bool IsRunning => _cts is { IsCancellationRequested: false };
-
     /// <summary>Modos em que os números principais são os da placa de vídeo.</summary>
     private bool GpuFocus => _mode is StressMode.Gpu or StressMode.Vram;
     private bool UsesGpu => _mode is StressMode.Gpu or StressMode.Vram or StressMode.Tudo;
@@ -45,10 +42,18 @@ public partial class StressView : UserControl
 
     private async void Start_Click(object sender, RoutedEventArgs e)
     {
-        _mode = (StressMode)ModeBox.SelectedIndex;
+        var mode = (StressMode)ModeBox.SelectedIndex;
         var minutes = int.Parse((string)((ComboBoxItem)DurationBox.SelectedItem).Tag);
+        var tempLimit = int.Parse((string)((ComboBoxItem)LimitBox.SelectedItem).Tag);
+        if (!HardwareTest.Slot.Wait(0))
+        {
+            MessageBox.Show("Aguarde o teste de hardware em andamento terminar.", "SoNexus");
+            return;
+        }
+
+        _mode = mode;
         _duration = minutes > 0 ? TimeSpan.FromMinutes(minutes) : null;
-        _tempLimit = int.Parse((string)((ComboBoxItem)LimitBox.SelectedItem).Tag);
+        _tempLimit = tempLimit;
         _stopReason = _gpuError = null;
         _maxTemp = _maxPower = _maxClock = _maxGpuTemp = 0;
         _minClock = float.MaxValue;
@@ -69,46 +74,83 @@ public partial class StressView : UserControl
 
         _test = new StressTest();
         _gpu = null;
-        _cts = new CancellationTokenSource();
+        using var cancellation = new CancellationTokenSource();
+        _cts = cancellation;
         _clock = Stopwatch.StartNew();
-        _timer.Start();
-        Tick();
 
-        var tasks = new List<Task>();
-        var threads = Environment.ProcessorCount;
-        switch (_mode)
+        try
         {
-            case StressMode.Cpu or StressMode.CpuMemoria:
-                tasks.Add(_test.RunAsync(_mode, threads, _cts.Token));
-                break;
-            case StressMode.Ram:
-                tasks.Add(_test.RunRamAsync(threads, _cts.Token));
-                break;
-            case StressMode.Tudo:
-                // Deixa 1 thread livre para alimentar a placa de vídeo.
-                tasks.Add(_test.RunAsync(StressMode.Cpu, Math.Max(1, threads - 1), _cts.Token));
-                break;
+            _timer.Start();
+            Tick();
+            var tasks = new List<Task>();
+            var threads = Environment.ProcessorCount;
+            if (!_cts.IsCancellationRequested)
+            {
+                switch (_mode)
+                {
+                    case StressMode.Cpu or StressMode.CpuMemoria:
+                        tasks.Add(_test.RunAsync(_mode, threads, _cts.Token));
+                        break;
+                    case StressMode.Ram:
+                        tasks.Add(_test.RunRamAsync(threads, _cts.Token));
+                        break;
+                    case StressMode.Tudo:
+                        // Deixa 1 thread livre para alimentar a placa de vídeo.
+                        tasks.Add(_test.RunAsync(StressMode.Cpu, Math.Max(1, threads - 1), _cts.Token));
+                        break;
+                }
+                if (UsesGpu) tasks.Add(RunGpuAsync(_cts.Token));
+            }
+            await Task.WhenAll(tasks.Select(CancelOnFailure));
+            _clock.Stop();
+            Tick();
+            ShowResult();
         }
-        if (UsesGpu) tasks.Add(RunGpuAsync(_cts.Token));
+        catch (Exception ex)
+        {
+            _stopReason = $"O teste não terminou: {ex.Message}";
+            AppLog.Write($"Stress: {ex}");
+            ShowResult();
+        }
+        finally
+        {
+            _clock.Stop();
+            _timer.Stop();
+            try { _gpu?.Dispose(); }
+            finally
+            {
+                _gpu = null;
+                _cts = null;
+                SetupPanel.IsEnabled = true;
+                StartButton.Visibility = Visibility.Visible;
+                StopButton.Visibility = Visibility.Collapsed;
+                HardwareTest.Slot.Release();
+            }
+        }
 
-        await Task.WhenAll(tasks);
-
-        _timer.Stop();
-        Tick();
-        ShowResult();
-        _gpu?.Dispose();
-        SetupPanel.IsEnabled = true;
-        StartButton.Visibility = Visibility.Visible;
-        StopButton.Visibility = Visibility.Collapsed;
+        async Task CancelOnFailure(Task task)
+        {
+            try { await task.ConfigureAwait(false); }
+            catch
+            {
+                cancellation.Cancel();
+                throw;
+            }
+        }
     }
 
     private Task RunGpuAsync(CancellationToken ct) => Task.Run(() =>
     {
         try
         {
-            _gpu = GpuTester.Create();
-            if (_mode == StressMode.Vram) _gpu.RunVram(ct);
-            else _gpu.RunCompute(ct);
+            var gpu = GpuTester.Create();
+            _gpu = gpu;
+            if (_mode == StressMode.Vram) gpu.RunVram(ct, Limit(true));
+            else gpu.RunCompute(ct, Limit(true));
+        }
+        catch (HardwareTestSafetyException ex)
+        {
+            Dispatcher.Invoke(() => StopForSafety(ex.Message));
         }
         catch (Exception ex)
         {
@@ -126,9 +168,12 @@ public partial class StressView : UserControl
         TimeText.Text = elapsed.ToString(@"hh\:mm\:ss");
         TimeDetail.Text = _duration is { } d ? $"de {d:hh\\:mm\\:ss}" : "sem limite";
 
-        var r = HardwareService.Instance.Readings;
+        var r = HardwareService.Instance.FreshReadings;
         var (cpuTemp, cpuPower, cpuClock) = HardwareService.CpuNow(r);
-        var (gpuTemp, gpuLoad, gpuPower, gpuClock) = HardwareService.GpuNow(r);
+        var gpu = _gpu;
+        var gpuReadings = gpu == null ? Array.Empty<SensorReading>() : HardwareService.TestGpuReadings(r, gpu.AdapterName).ToArray();
+        var gpuTemp = HardwareService.TestGpuTemp(gpuReadings);
+        var (_, gpuLoad, gpuPower, gpuClock) = HardwareService.GpuNow(gpuReadings);
         if (gpuTemp is { } gt) _maxGpuTemp = Math.Max(_maxGpuTemp, gt);
 
         var (temp, power, clock) = GpuFocus ? (gpuTemp, gpuPower, gpuClock) : (cpuTemp, cpuPower, cpuClock);
@@ -143,10 +188,9 @@ public partial class StressView : UserControl
         // Segurança: para se qualquer peça em teste passar do limite.
         if (_clock.IsRunning && _stopReason == null)
         {
-            if (!GpuFocus && _mode != StressMode.Ram && cpuTemp >= _tempLimit)
-                StopForSafety($"o processador chegou a {cpuTemp:0} °C (limite {_tempLimit} °C)");
-            else if (UsesGpu && gpuTemp >= Limit(true))
-                StopForSafety($"a placa de vídeo chegou a {gpuTemp:0} °C (limite {Limit(true)} °C)");
+            if (!GpuFocus && _mode != StressMode.Ram && (cpuTemp == null || cpuTemp >= _tempLimit))
+                StopForSafety(cpuTemp == null ? "sem leitura recente de temperatura do processador"
+                    : $"o processador chegou a {cpuTemp:0} °C (limite {_tempLimit} °C)");
         }
         if (power is { } p)
         {
@@ -189,7 +233,7 @@ public partial class StressView : UserControl
 
     private void StopForSafety(string what)
     {
-        _stopReason = $"Parado por segurança: {what}.";
+        _stopReason ??= $"Parado por segurança: {what}.";
         _cts?.Cancel();
     }
 
@@ -219,6 +263,13 @@ public partial class StressView : UserControl
         else if (!string.IsNullOrEmpty(_stopReason) && _stopReason.StartsWith("Parado por segurança"))
         {
             text = _stopReason + " Verifique o cooler, a pasta térmica e a ventilação do gabinete.";
+            color = Metric.Warn;
+        }
+        else if (_stopReason?.StartsWith("O teste não terminou") == true
+            || (_mode == StressMode.Ram && (_test.Iterations == 0 || _test.RamAllocationFailures > 0)))
+        {
+            text = _stopReason?.StartsWith("O teste não terminou") == true ? _stopReason
+                : $"Teste de RAM inconclusivo: {Format.Bytes(_test.RamTested)} verificados, {_test.RamAllocationFailures} falha(s) de alocação.";
             color = Metric.Warn;
         }
         else

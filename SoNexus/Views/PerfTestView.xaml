@@ -44,7 +44,7 @@
                                    Text="Feche jogos e programas pesados para o resultado ser justo. Para sozinho se o processador passar de 95 °C ou a placa de 90 °C."/>
                     </StackPanel>
                     <TextBlock x:Name="SensorWarn" Visibility="Collapsed" Foreground="{StaticResource DangerBrush}" Margin="0,10,0,0" TextWrapping="Wrap"
-                               Text="Sem leitura de temperatura (abra o SoNexus como administrador): o corte de segurança por temperatura não vai funcionar."/>
+                               Text="O teste exige leitura recente da temperatura do processador. Confira a aba Sensores e tente de novo."/>
                 </StackPanel>
             </Border>
 

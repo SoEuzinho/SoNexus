@@ -171,31 +171,43 @@ public partial class SettingsView : UserControl
     {
         var dialog = new SaveFileDialog { FileName = "sonexus-configuracoes.json", Filter = "Configurações do SoNexus (*.json)|*.json" };
         if (dialog.ShowDialog() != true) return;
-        S.Save();
-        File.Copy(AppSettings.Path_, dialog.FileName, overwrite: true);
-        DataStatus.Text = $"✔ Exportado para {dialog.FileName}";
+        try
+        {
+            File.WriteAllText(dialog.FileName, JsonSerializer.Serialize(S));
+            DataStatus.Text = $"✔ Exportado para {dialog.FileName}";
+        }
+        catch (Exception ex)
+        {
+            DataStatus.Text = $"✖ Não foi possível exportar: {ex.Message}";
+        }
     }
 
     private void Import_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new OpenFileDialog { Filter = "Configurações do SoNexus (*.json)|*.json" };
         if (dialog.ShowDialog() != true) return;
+        AppSettings imported;
         try
         {
-            // Confere se é mesmo um arquivo de configurações antes de trocar.
-            var text = File.ReadAllText(dialog.FileName);
-            _ = JsonSerializer.Deserialize<AppSettings>(text) ?? throw new InvalidDataException();
-            File.WriteAllText(AppSettings.Path_, text);
-            AppSettings.DisableSave(); // não regravar as antigas por cima até reabrir
+            imported = AppSettings.Parse(File.ReadAllText(dialog.FileName));
         }
         catch
         {
             DataStatus.Text = "✖ Esse arquivo não é uma configuração do SoNexus.";
             return;
         }
-        if (MessageBox.Show("Configurações importadas. Reabrir o SoNexus agora para aplicar tudo?", "SoNexus",
-                MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
-            SensorDriver.RestartApp();
+        if (MessageBox.Show("Importar estas configurações e reabrir o SoNexus agora?", "SoNexus",
+                MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        try
+        {
+            imported.SaveForRestart();
+        }
+        catch (Exception ex)
+        {
+            DataStatus.Text = $"✖ Não foi possível importar: {ex.Message}";
+            return;
+        }
+        SensorDriver.RestartApp();
     }
 
     private void ClearCache_Click(object sender, RoutedEventArgs e)

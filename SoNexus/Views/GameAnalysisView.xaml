@@ -14,7 +14,7 @@
         <StackPanel Margin="0,0,14,0">
             <TextBlock Text="Seu PC para jogos" Style="{StaticResource H1}"/>
             <TextBlock Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,20" TextWrapping="Wrap"
-                       Text="Quanto a placa de vídeo e o processador rendem, quem limita o FPS em cada resolução (gargalo) e o que dá para melhorar."/>
+                       Text="Compare partidas registradas e consulte estimativas por resolução para o seu hardware."/>
 
             <UniformGrid Columns="3">
                 <Border Style="{StaticResource Card}" Margin="0,0,12,12">
@@ -45,9 +45,9 @@
             <!-- Medido de verdade: vem das partidas gravadas em FPS ao vivo -->
             <Border Style="{StaticResource Card}" Margin="0,0,12,12">
                 <StackPanel>
-                    <TextBlock Text="GARGALO MEDIDO NAS SUAS PARTIDAS" Style="{StaticResource Label}" Margin="0,0,0,6"/>
+                    <TextBlock Text="TELEMETRIA DAS SUAS PARTIDAS" Style="{StaticResource Label}" Margin="0,0,0,6"/>
                     <TextBlock x:Name="MeasuredStatus" Style="{StaticResource Muted}" TextWrapping="Wrap"
-                               Text="Nenhuma partida medida ainda. Abra Jogos › FPS ao vivo, clique em Iniciar medição e jogue pelo menos 30 segundos: o SoNexus anota, segundo a segundo, se quem segurou o FPS foi a placa, o processador, a temperatura ou um limitador."/>
+                               Text="Nenhuma partida registrada. Inicie a medição em Jogos › FPS ao vivo e jogue por pelo menos 30 segundos."/>
                     <ItemsControl x:Name="MeasuredList">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
@@ -62,7 +62,7 @@
                                         <TextBlock Text="{Binding When}" FontSize="11" Foreground="{StaticResource MutedBrush}"/>
                                     </StackPanel>
                                     <StackPanel Grid.Column="1">
-                                        <TextBlock Text="LIMITE" Style="{StaticResource Label}"/>
+                                        <TextBlock Text="SINAL MAIS FREQUENTE" Style="{StaticResource Label}"/>
                                         <TextBlock FontWeight="SemiBold"><Run Text="{Binding Main, Mode=OneWay}"/><Run Text=" "/><Run Text="{Binding MainPct, Mode=OneWay, StringFormat={}{0:0}%}" Foreground="{StaticResource MutedBrush}"/></TextBlock>
                                     </StackPanel>
                                     <StackPanel Grid.Column="2">
@@ -78,9 +78,46 @@
 
             <Border Style="{StaticResource Card}" Margin="0,0,12,12">
                 <StackPanel>
+                    <TextBlock Text="Comparar duas partidas" Style="{StaticResource H2}"/>
+                    <TextBlock x:Name="ComparisonStatus" Style="{StaticResource Muted}" Margin="0,4,0,8" TextWrapping="Wrap"/>
+                    <StackPanel x:Name="ComparisonControls" Visibility="Collapsed">
+                        <UniformGrid Columns="3">
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Text="Partida A" Foreground="#59D9E9"/>
+                                <ComboBox x:Name="FirstSession" DisplayMemberPath="ComparisonLabel" SelectionChanged="FirstSession_Changed"/>
+                            </StackPanel>
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Text="Partida B" Foreground="#F0BB78"/>
+                                <ComboBox x:Name="SecondSession" DisplayMemberPath="ComparisonLabel" SelectionChanged="Comparison_Changed"/>
+                            </StackPanel>
+                            <StackPanel>
+                                <TextBlock Text="Métrica" Style="{StaticResource Muted}"/>
+                                <ComboBox x:Name="TimelineMetric" SelectedIndex="0" SelectionChanged="Comparison_Changed">
+                                    <ComboBoxItem Content="Menor FPS por intervalo"/>
+                                    <ComboBoxItem Content="Pico de temperatura da CPU"/>
+                                    <ComboBoxItem Content="Pico de temperatura da GPU"/>
+                                    <ComboBoxItem Content="Engasgos estimados por intervalo"/>
+                                </ComboBox>
+                            </StackPanel>
+                        </UniformGrid>
+                        <TextBlock x:Name="ComparisonSummary" Margin="0,8,0,6" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="TimelineScale" Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+                        <Viewbox Stretch="Fill" Height="105" Margin="0,4,0,0">
+                            <Canvas Width="600" Height="100" Background="#151515" ClipToBounds="True">
+                                <Line X2="600" Y1="50" Y2="50" Stroke="#363636"/>
+                                <Path x:Name="FirstPlot" Stroke="#59D9E9" StrokeThickness="1.6"/>
+                                <Path x:Name="SecondPlot" Stroke="#F0BB78" StrokeThickness="1.6"/>
+                            </Canvas>
+                        </Viewbox>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Margin="0,0,12,12">
+                <StackPanel>
                     <TextBlock Text="GARGALO ESTIMADO POR RESOLUÇÃO" Style="{StaticResource Label}" Margin="0,0,0,6"/>
                     <TextBlock Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,12"
-                               Text="Gargalo é a peça que segura as outras. A cada quadro, o processador prepara a cena (física, IA, comandos) e a placa de vídeo desenha. O FPS final é o da peça mais lenta: se o processador só prepara 80 quadros, uma placa capaz de 150 fica parada metade do tempo. Em resoluções maiores a placa trabalha mais e o processador pesa menos."/>
+                               Text="Modelo aproximado de um jogo pesado genérico. As barras mostram proporções calculadas a partir de tabelas de hardware."/>
                     <ItemsControl x:Name="BottleneckList">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
@@ -107,8 +144,7 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <TextBlock Style="{StaticResource Muted}" Margin="0,8,0,0" TextWrapping="Wrap"
-                               Text="Estimativa pelo desempenho médio de cada peça em reviews, para um jogo pesado. Cada jogo é diferente: o que vale é a medição das suas partidas, logo acima."/>
+                    <TextBlock x:Name="BottleneckStatus" Style="{StaticResource Muted}" Margin="0,8,0,0" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
 

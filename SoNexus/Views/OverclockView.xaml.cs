@@ -90,7 +90,8 @@ public partial class OverclockView : UserControl
         try
         {
             var s = Nvml.Status(_gpu);
-            GpuLive.Text = $"{s.Temp} °C · {s.PowerW:0} W · núcleo {s.CoreMHz} MHz · memória {s.MemMHz} MHz" +
+            var temperature = s.Temp is { } temp ? $"{temp} °C" : "temperatura indisponível";
+            GpuLive.Text = $"{temperature} · {s.PowerW:0} W · núcleo {s.CoreMHz} MHz · memória {s.MemMHz} MHz" +
                            (s.FanPercent is { } f ? $" · ventoinha {f}%" : "");
         }
         catch (Exception ex)
@@ -117,16 +118,17 @@ public partial class OverclockView : UserControl
     {
         if (_gpu == null || _limits == null || !AppSettings.Current.OverclockRulesAccepted) return;
         // Regra 4: placa já quente não recebe overclock.
-        try
+        uint? temperature;
+        try { temperature = Nvml.Status(_gpu).Temp; }
+        catch { temperature = null; }
+        if (temperature is null or >= 85)
         {
-            if (Nvml.Status(_gpu).Temp >= 85)
-            {
-                OcStatus.Text = "✖ A placa está a 85 °C ou mais. Melhore a refrigeração antes de fazer overclock.";
-                OcStatus.Foreground = Metric.Danger;
-                return;
-            }
+            OcStatus.Text = temperature == null
+                ? "✖ Não foi possível verificar a temperatura da placa. Ajustes bloqueados."
+                : "✖ A placa está a 85 °C ou mais. Melhore a refrigeração antes de fazer overclock.";
+            OcStatus.Foreground = Metric.Danger;
+            return;
         }
-        catch { }
         var core = _limits.CoreSupported ? (int?)Math.Round(CoreSlider.Value / 5) * 5 : null;
         var mem = _limits.MemSupported ? (int?)Math.Round(MemSlider.Value / 10) * 10 : null;
         if ((core > 150 || mem > 1000) && MessageBox.Show(

@@ -19,8 +19,14 @@ public partial class AudioDriversView : UserControl
         DriverGrid.ItemsSource = drivers;
         DriverTitle.Text = $"Drivers de áudio ({drivers.Count})";
 
-        var (devices, _) = AudioService.Load();
-        var software = await Task.Run(() => AudioService.DetectSoftware(devices));
+        var (devices, apps) = AudioService.Load();
+        List<AudioSoftware> software;
+        try { software = await Task.Run(() => AudioService.DetectSoftware(devices)); }
+        finally
+        {
+            foreach (var app in apps) app.Dispose();
+            foreach (var device in devices) device.Dispose();
+        }
         SoftwareList.ItemsSource = software.Count > 0
             ? software
             : new List<AudioSoftware> { new("Nenhum programa de áudio extra", "", "Só o driver padrão do Windows/placa-mãe está em uso.") };

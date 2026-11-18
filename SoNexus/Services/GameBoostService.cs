@@ -61,6 +61,15 @@ public sealed class GameBoostService
         }
     }
 
+    public void SetProBalance(bool enabled)
+    {
+        lock (_lock)
+        {
+            AppSettings.Current.ProBalance = enabled;
+            if (!enabled) RestoreLowered();
+        }
+    }
+
     private void Tick()
     {
         lock (_lock)
@@ -143,7 +152,7 @@ public sealed class GameBoostService
         _sampleAt = now;
     }
 
-    private void RestoreAll()
+    private void RestoreLowered()
     {
         foreach (var (pid, (original, name)) in _lowered)
         {
@@ -156,6 +165,12 @@ public sealed class GameBoostService
         }
         if (_lowered.Count > 0) Add($"{_lowered.Count} programa(s) de volta ao normal");
         _lowered.Clear();
+        _cpuBefore.Clear();
+    }
+
+    private void RestoreAll()
+    {
+        RestoreLowered();
         if (_gamePid is { } g && _gameOriginal is { } orig)
         {
             try

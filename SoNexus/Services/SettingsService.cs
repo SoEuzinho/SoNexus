@@ -91,8 +91,8 @@ public sealed class AppSettings
     public bool AllowOnline { get; set; } = true;
 
     /// <summary>Tamanho, posição e página da janela da última vez.</summary>
-    public double WindowLeft { get; set; } = double.NaN;
-    public double WindowTop { get; set; } = double.NaN;
+    public double? WindowLeft { get; set; }
+    public double? WindowTop { get; set; }
     public double WindowWidth { get; set; } = 1320;
     public double WindowHeight { get; set; } = 860;
     public bool WindowMaximized { get; set; }
@@ -102,7 +102,10 @@ public sealed class AppSettings
     public bool OverclockRulesAccepted { get; set; }
 
     /// <summary>O que aparece sobre o jogo (chaves de <c>FpsView.OverlayItems</c>).</summary>
-    public List<string> OverlayItems { get; set; } = new() { "fps", "low", "cpu", "cputemp", "gpu", "gputemp", "ram", "gameram" };
+    public List<string> OverlayItems { get; set; } = DefaultOverlayItems();
+
+    private static List<string> DefaultOverlayItems() =>
+        new() { "fps", "low", "cpu", "cputemp", "gpu", "gputemp", "ram", "gameram" };
 
     /// <summary>0 = canto superior esquerdo, 1 = superior direito, 2 = inferior esquerdo, 3 = inferior direito.</summary>
     public int OverlayCorner { get; set; }
@@ -140,7 +143,7 @@ public sealed class AppSettings
     {
         try
         {
-            return File.Exists(FilePath) ? JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(FilePath)) ?? new() : new();
+            return File.Exists(FilePath) ? Parse(File.ReadAllText(FilePath)) : new();
         }
         catch
         {
@@ -149,18 +152,58 @@ public sealed class AppSettings
     }
 
     private static bool _saveDisabled;
+    private static readonly object SaveLock = new();
+
+    public static AppSettings Parse(string text)
+    {
+        var settings = JsonSerializer.Deserialize<AppSettings>(text) ?? throw new InvalidDataException();
+        settings.OverlayItems ??= DefaultOverlayItems();
+        settings.LastPage ??= "NavHome";
+        settings.Rgb ??= new();
+        settings.Rgb.Excluded ??= new();
+        settings.Rgb.Favorites ??= new();
+        settings.Rgb.BleDevices ??= new();
+        settings.Rgb.BleDevices.RemoveAll(device => device == null);
+        return settings;
+    }
+
+    public void SaveForRestart()
+    {
+        lock (SaveLock)
+        {
+            WriteSettings();
+            _saveDisabled = true;
+        }
+    }
 
     /// <summary>Depois de importar/restaurar: o app reabre sem gravar as configurações antigas por cima.</summary>
-    public static void DisableSave() => _saveDisabled = true;
+    public static void DisableSave()
+    {
+        lock (SaveLock) _saveDisabled = true;
+    }
 
     public void Save()
     {
-        if (_saveDisabled) return;
+        lock (SaveLock)
+        {
+            if (_saveDisabled) return;
+            try { WriteSettings(); }
+            catch (Exception ex) { AppLog.Write($"Não foi possível salvar as configurações: {ex.Message}"); }
+        }
+    }
+
+    private void WriteSettings()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
+        var temporary = $"{FilePath}.{Guid.NewGuid():N}.tmp";
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(this));
+            File.WriteAllText(temporary, JsonSerializer.Serialize(this));
+            File.Move(temporary, FilePath, overwrite: true);
         }
-        catch { }
+        finally
+        {
+            try { File.Delete(temporary); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        }
     }
 }

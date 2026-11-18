@@ -3,7 +3,7 @@ using System.Text;
 
 namespace SoNexus.Services;
 
-public sealed record NvStatus(uint Temp, double PowerW, uint CoreMHz, uint MemMHz, uint? FanPercent);
+public sealed record NvStatus(uint? Temp, double PowerW, uint CoreMHz, uint MemMHz, uint? FanPercent);
 
 public sealed record NvLimits(
     double PowerMinW, double PowerMaxW, double PowerDefaultW, double PowerCurrentW,
@@ -54,7 +54,8 @@ public static class Nvml
 
     public static NvStatus Status(Gpu g)
     {
-        nvmlDeviceGetTemperature(g.Handle, 0, out var temp);
+        uint? temp = nvmlDeviceGetTemperature(g.Handle, 0, out var reading) == 0 && reading is > 0 and < 150
+            ? reading : null;
         nvmlDeviceGetPowerUsage(g.Handle, out var mw);
         nvmlDeviceGetClockInfo(g.Handle, 0, out var core);
         nvmlDeviceGetClockInfo(g.Handle, 2, out var mem);

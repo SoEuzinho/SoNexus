@@ -125,7 +125,8 @@ public sealed class FanControlService
     public static FanControlService Instance { get; } = new();
 
     private Timer? _timer;
-    private int _busy;
+    private readonly object _controlLock = new();
+    private bool _stopped;
 
     public List<FanChannel> Channels { get; private set; } = new();
     public bool Started { get; private set; }
@@ -133,28 +134,32 @@ public sealed class FanControlService
 
     public void Start()
     {
-        if (Started) return;
-        Channels = HardwareService.Instance.GetFanControls().Select(c => new FanChannel(c.Control, c.Rpm)).ToList();
-        try
+        lock (_controlLock)
         {
-            if (File.Exists(ConfigPath))
+            if (Started || _stopped) return;
+            Channels = HardwareService.Instance.GetFanControls().Select(c => new FanChannel(c.Control, c.Rpm)).ToList();
+            try
             {
-                var saved = JsonSerializer.Deserialize<List<FanConfig>>(File.ReadAllText(ConfigPath)) ?? new();
-                foreach (var ch in Channels)
-                    if (saved.FirstOrDefault(s => s.Id == ch.Id) is { } cfg) ch.Load(cfg);
+                if (File.Exists(ConfigPath))
+                {
+                    var saved = JsonSerializer.Deserialize<List<FanConfig>>(File.ReadAllText(ConfigPath)) ?? new();
+                    foreach (var ch in Channels)
+                        if (saved.FirstOrDefault(s => s.Id == ch.Id) is { } cfg) ch.Load(cfg);
+                }
             }
+            catch { }
+            Started = true;
+            _timer = new Timer(_ => Tick(), null, 1000, 2000);
         }
-        catch { }
-        Started = true;
-        _timer = new Timer(_ => Tick(), null, 1000, 2000);
         Ready?.Invoke(this, EventArgs.Empty);
     }
 
     private void Tick()
     {
-        if (Interlocked.Exchange(ref _busy, 1) == 1) return;
+        if (!Monitor.TryEnter(_controlLock)) return;
         try
         {
+            if (_stopped) return;
             var r = HardwareService.Instance.Readings;
             var cpuTemp = HardwareService.CpuNow(r).Temp;
             var gpuTemp = HardwareService.GpuNow(r).Temp;
@@ -217,7 +222,7 @@ public sealed class FanControlService
         }
         finally
         {
-            Volatile.Write(ref _busy, 0);
+            Monitor.Exit(_controlLock);
         }
     }
 
@@ -237,11 +242,16 @@ public sealed class FanControlService
     /// <summary>Devolve todas as ventoinhas para o controle automático (ao fechar o programa).</summary>
     public void RestoreAll()
     {
-        _timer?.Dispose();
-        SpinWait.SpinUntil(() => Volatile.Read(ref _busy) == 0, 2000);
-        foreach (var ch in Channels)
+        lock (_controlLock)
         {
-            try { HardwareService.Instance.SetControl(ch.Control, null); } catch { }
+            _stopped = true;
+            _timer?.Dispose();
+            _timer = null;
+            foreach (var ch in Channels)
+            {
+                try { HardwareService.Instance.SetControl(ch.Control, null); }
+                catch (Exception ex) { AppLog.Write($"Não foi possível restaurar a ventoinha {ch.Title}: {ex.Message}"); }
+            }
         }
     }
 }
