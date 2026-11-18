@@ -1,0 +1,65 @@
+SONEXUS · GUIA DE USO E COMPONENTES
+
+ONDE ENCONTRAR CADA RECURSO
+
+Início e Hardware
+Use o resumo do PC para conferir atividade e temperaturas. Em Hardware, abra Processador, Placa de vídeo, Memória ou Armazenamento para ver sensores e detalhes da peça. O histórico SMART registra leituras compatíveis ao abrir ou atualizar a tela e destaca aumentos nos contadores de erros. As métricas disponíveis variam conforme a peça, o controlador e o driver.
+
+Jogos
+Biblioteca consulta instalações dos launchers compatíveis. Em FPS ao vivo, selecione o processo ou use a seleção automática. O FPS representa apresentações registradas via ETW. Em Seu PC e gargalo, compare duas sessões do mesmo jogo após registrar pelo menos 30 segundos em cada uma. O diagnóstico de gargalo usa regras e sensores do sistema. As previsões da biblioteca usam requisitos e tabelas de referência.
+
+Overlay
+Abra o painel em Jogos › FPS ao vivo ou use Ctrl+Shift+F se o atalho global estiver habilitado. Durante a medição, crie um perfil para o executável selecionado e ajuste posição, visual e métricas. A configuração padrão vale para jogos sem perfil.
+
+Desempenho e Ferramentas
+Faça benchmarks separados ou use Teste completo. Testes de carga precisam de sensores compatíveis e recentes para a proteção térmica. Os ajustes de overclock dependem do driver e do hardware. Ferramentas reúne memória em espera, prioridade de jogos, limpeza, instalação de programas e teste do monitor.
+
+Drivers
+Drivers › Placa de vídeo mostra opções de instalação. Em Remover driver de vídeo, confira os pacotes selecionados e mantenha o backup habilitado para exportá-los antes da remoção. Use a ação de reinstalar pacote para abrir um INF exportado. O Windows determina se o pacote pode ser aplicado aos dispositivos.
+
+Otimização
+Em Debloat do Windows, revise a seleção e a descrição de cada ajuste antes de aplicar. Use o ponto de restauração do Windows quando disponível. A recuperação dos ajustes depende dos valores originais preservados no backup. A remoção de apps é uma operação separada. Inicialização lista programas que começam com o Windows.
+
+Rede
+Visão geral apresenta os adaptadores e testes de conexão. Aplicativos e conexões mostra tráfego por processo. Rotas compara o percurso até um destino. Em Segurança, clique em Analisar sinais locais para revisar processos, chaves Run e RunOnce, tarefas agendadas e conexões TCP do PC. A confirmação de assinatura usa o cache local do Windows. Os sinais podem apontar programas legítimos. Abra a Segurança do Windows para uma verificação antivírus.
+
+Áudio
+Dispositivos mostra entradas, saídas, formato e volume das sessões de áudio. Use os botões de volume e mudo ao lado de cada sessão para controlar aplicativos individualmente. O período mostrado para cada dispositivo é o informado pela API de áudio do Windows. A integração Voicemeeter depende da instalação e da biblioteca de controle remoto do fabricante.
+
+Diagnóstico
+Erros e telas azuis consulta registros do Windows. A aba Relatório de suporte oferece uma prévia antes da exportação. Latência (DPC) mostra amostras para investigar travamentos e interrupções.
+
+Integração e Configurações
+Use OpenRGB com o servidor SDK do OpenRGB ou selecione fitas Bluetooth compatíveis em Iluminação RGB. Em Configurações, ajuste aparência, atalhos globais, bandeja, alertas, consultas online e arquivos locais. Use Ctrl+Shift+S para mostrar ou recolher a janela se o atalho estiver habilitado.
+
+DADOS LOCAIS E CONEXÕES
+
+%LOCALAPPDATA%\SoNexus — configurações, logs, perfis do overlay e históricos.
+%PROGRAMDATA%\SoNexus — backups de ajustes do sistema e outros arquivos protegidos.
+Configurações › Privacidade controla as consultas online opcionais. A seção Sobre abre os termos, licenças e a pasta de registros.
+
+COMO LER O INVENTÁRIO DE DLLS
+
+A aba DLLs da instalação lista as bibliotecas encontradas na pasta do aplicativo. A origem do pacote vem de SoNexus.deps.json. A versão e a descrição são lidas dos metadados do arquivo. Um travessão indica informação indisponível. O número de arquivos varia com a publicação e os recursos de idioma.
+
+SoNexus.dll — código principal, interface, telemetria e ferramentas.
+LibreHardwareMonitorLib.dll e dependências — leitura de hardware e sensores.
+Microsoft.Diagnostics.Tracing.TraceEvent.dll e dependências — leitura de eventos ETW de FPS, rede e diagnóstico.
+NAudio.Wasapi.dll e NAudio.Core.dll — dispositivos, sessões e medidores de áudio do Windows.
+Vortice.*.dll e SharpGen.Runtime*.dll — Direct3D, DXGI, compilação de shaders e interoperação para testes gráficos.
+Microsoft.Windows.SDK.NET.dll e WinRT.Runtime.dll — projeções .NET das APIs WinRT, incluindo a integração Bluetooth.
+System.Management.dll e System.Diagnostics.EventLog.dll — consultas WMI e registros de eventos do Windows.
+System.*.dll, Presentation*.dll e demais DLLs dos pacotes runtimepack.* — runtime .NET, bibliotecas-base, WPF, Windows Forms e renderização. As DLLs *.resources.dll trazem recursos de idioma.
+
+BIBLIOTECAS EXTERNAS USADAS QUANDO DISPONÍVEIS
+
+nvml.dll — biblioteca instalada pelo driver NVIDIA para métricas e controles suportados.
+VoicemeeterRemote64.dll — API instalada pelo Voicemeeter para ler e controlar parâmetros do mixer.
+user32.dll, dwmapi.dll — janelas, monitor, atalhos e composição visual.
+kernel32.dll, psapi.dll, ntdll.dll — processos, memória, leitura de dispositivos e diagnósticos.
+advapi32.dll, userenv.dll — permissões e ambiente de processos do Windows.
+iphlpapi.dll — tabela de conexões TCP do Windows.
+wintrust.dll — verificação de assinaturas digitais.
+PawnIO — driver opcional para sensores, oferecido pelo app em seu instalador oficial.
+
+Windows, PowerShell, PnPUtil, WinGet e OpenRGB são componentes externos usados em seus respectivos recursos. Consulte Licenças de terceiros na tela Sobre para os créditos e licenças das dependências.

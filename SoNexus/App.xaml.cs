@@ -11,12 +11,14 @@ public partial class App : Application
     private Mutex? _instance;
     private EventWaitHandle? _showSignal;
     private string? _restartPath;
+    private MainWindow? _mainWindow;
 
     /// <summary>"Fechar completamente": encerra mesmo com a opção de segundo plano ligada.</summary>
     public static bool Exiting { get; private set; }
 
     public static void ExitCompletely()
     {
+        if (Exiting) return;
         Exiting = true;
         Current.Shutdown();
     }
@@ -87,7 +89,7 @@ public partial class App : Application
             FanControlService.Instance.RestoreAll();
         };
 
-        var window = new MainWindow();
+        var window = _mainWindow = new MainWindow();
         MainWindow = window;
         // Aberto pelo "Iniciar com o Windows": começa direto na bandeja.
         // (Com termos novos ainda não aceitos, abre a janela mesmo assim para pedir o aceite.)
@@ -124,13 +126,20 @@ public partial class App : Application
 
     public void Restart()
     {
+        if (Exiting) return;
         _restartPath = Environment.ProcessPath;
         ExitCompletely();
     }
 
+    protected override void OnSessionEnding(SessionEndingCancelEventArgs e)
+    {
+        base.OnSessionEnding(e);
+        if (!e.Cancel) Exiting = true;
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
-        if (MainWindow is MainWindow main)
+        if (_mainWindow is { } main)
         {
             main.StopFpsMonitoring();
             FanControlService.Instance.RestoreAll();

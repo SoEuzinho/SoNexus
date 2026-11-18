@@ -15,12 +15,12 @@
             <StackPanel Margin="0,0,330,0">
                 <TextBlock Text="Debloat do Windows" Style="{StaticResource H1}"/>
                 <TextBlock Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,0" TextWrapping="Wrap"
-                           Text="Remove propaganda, telemetria, IA e apps desnecessários. Cada ajuste guarda o valor original e pode ser revertido."/>
+                           Text="Revise ajustes de privacidade, anúncios e componentes do Windows. A lista indica quais ajustes têm backup do original."/>
             </StackPanel>
             <StackPanel x:Name="TopBar" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                 <Button Content="Importar" Margin="0,0,8,0" Click="Import_Click"/>
                 <Button Content="Exportar" Margin="0,0,8,0" Click="Export_Click"/>
-                <Button Content="Aplicar padrão recomendado" Style="{StaticResource PrimaryButton}" Click="Default_Click"/>
+                <Button Content="Selecionar recomendados" Style="{StaticResource PrimaryButton}" Click="Recommended_Click"/>
             </StackPanel>
         </Grid>
 
@@ -34,17 +34,17 @@
                      FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
         </Border>
 
-        <TabControl>
-            <TabItem Header="Ajustes do sistema">
+        <TabControl x:Name="TabPages">
+            <TabItem x:Name="TweaksTab" Header="Ajustes do sistema">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Margin="0,0,14,12">
                         <WrapPanel x:Name="TweakBar">
                             <Button Content="Aplicar selecionados" Style="{StaticResource PrimaryButton}" Margin="0,0,8,0" Click="Apply_Click"/>
                             <Button Content="Reverter selecionados" Margin="0,0,8,0" Click="Revert_Click"/>
-                            <Button Content="Selecionar recomendados" Margin="0,0,8,0" Click="Recommended_Click"/>
                             <Button Content="Ponto de restauração" Margin="0,0,8,0" Click="Restore_Click"/>
                             <Button Content="Reiniciar Explorer" Click="Explorer_Click"/>
                         </WrapPanel>
+                        <CheckBox x:Name="RestoreBeforeApply" Content="Criar ponto de restauração antes de aplicar" IsChecked="True" Margin="0,10,0,0"/>
                         <TextBlock x:Name="TweakStatus" Style="{StaticResource Muted}" FontSize="13" Margin="0,10,0,0"/>
                     </StackPanel>
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -71,7 +71,7 @@
                                                 <ColumnDefinition/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <CheckBox IsChecked="{Binding IsSelected}" IsEnabled="{Binding IsAvailable}"
+                                            <CheckBox IsChecked="{Binding IsSelected}" IsEnabled="{Binding CanSelect}"
                                                       VerticalAlignment="Center" Margin="0,0,14,0"/>
                                             <StackPanel Grid.Column="1">
                                                 <WrapPanel>

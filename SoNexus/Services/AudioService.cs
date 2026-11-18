@@ -12,8 +12,8 @@ namespace SoNexus.Services;
 public sealed class AudioDevice : ObservableObject, IDisposable
 {
     private double _peak;
-    private int _volume;
-    private bool _muted;
+    private int? _volume;
+    private bool? _muted;
 
     internal AudioDevice(MMDevice device, bool isDefault)
     {
@@ -28,7 +28,8 @@ public sealed class AudioDevice : ObservableObject, IDisposable
         IsDefault = isDefault;
         Format = ReadFormat(device);
         Latency = ReadLatency(device);
-        Refresh();
+        RefreshPeak();
+        RefreshVolume();
     }
 
     internal MMDevice Device { get; }
@@ -42,21 +43,31 @@ public sealed class AudioDevice : ObservableObject, IDisposable
     public string Latency { get; }
     public bool IsVirtual => AudioService.IsVirtualName(Name + " " + Adapter);
 
-    public double Peak { get => _peak; set => Set(ref _peak, value); }
-    public int Volume { get => _volume; set => Set(ref _volume, value); }
-    public bool Muted { get => _muted; set { if (Set(ref _muted, value)) Raise(nameof(VolumeText)); } }
-    public string VolumeText => _muted ? "mudo" : $"{_volume}%";
+    public double Peak { get => _peak; private set => Set(ref _peak, value); }
+    public int? Volume => _volume;
+    public string VolumeText => _muted == true ? "mudo" : _volume is { } volume ? $"{volume}%" : "—";
 
-    internal void Refresh()
+    internal void RefreshPeak()
     {
-        try { Peak = Device.AudioMeterInformation.MasterPeakValue * 100; } catch { }
+        try { Peak = Math.Round(Device.AudioMeterInformation.MasterPeakValue * 100); }
+        catch (COMException) { Peak = 0; }
+    }
+
+    internal void RefreshVolume()
+    {
+        int? volume = null;
+        bool? muted = null;
         try
         {
-            Volume = (int)Math.Round(Device.AudioEndpointVolume.MasterVolumeLevelScalar * 100);
-            Muted = Device.AudioEndpointVolume.Mute;
-            Raise(nameof(VolumeText));
+            var endpoint = Device.AudioEndpointVolume;
+            volume = AudioService.VolumePercent(endpoint.MasterVolumeLevelScalar);
+            muted = endpoint.Mute;
         }
-        catch { }
+        catch (COMException) { }
+        if (_volume == volume && _muted == muted) return;
+        _volume = volume;
+        _muted = muted;
+        Raise(nameof(VolumeText));
     }
 
     private static string ReadFormat(MMDevice d)
@@ -109,7 +120,7 @@ public sealed class AudioDevice : ObservableObject, IDisposable
 public sealed class AudioApp : ObservableObject, IDisposable
 {
     private double _peak;
-    private int _volume;
+    private (int Volume, bool Muted)? _controls;
 
     internal AudioApp(AudioSessionControl session, AudioDevice device)
     {
@@ -120,12 +131,12 @@ public sealed class AudioApp : ObservableObject, IDisposable
         catch { SessionId = Guid.NewGuid().ToString(); }
         var pid = (int)session.GetProcessID;
         Pid = pid;
-        if (session.IsSystemSoundsSession) Name = "Sons do sistema";
+        var label = session.DisplayName;
+        if (!string.IsNullOrWhiteSpace(label) && !label.StartsWith('@')) Name = label;
         else
-        {
             try { using var p = Process.GetProcessById(pid); Name = p.ProcessName; }
-            catch { Name = session.DisplayName is { Length: > 0 } n ? n : $"PID {pid}"; }
-        }
+            catch (ArgumentException) { Name = $"PID {pid}"; }
+            catch (InvalidOperationException) { Name = $"PID {pid}"; }
     }
 
     internal AudioSessionControl Session { get; }
@@ -134,13 +145,89 @@ public sealed class AudioApp : ObservableObject, IDisposable
     public int Pid { get; }
     public string Name { get; } = "";
     public string Device { get; }
-    public double Peak { get => _peak; set => Set(ref _peak, value); }
-    public int Volume { get => _volume; set => Set(ref _volume, value); }
-
-    internal void Refresh()
+    public double Peak { get => _peak; private set => Set(ref _peak, value); }
+    public string VolumeText => _controls is { } controls ? $"{controls.Volume}%" : "—";
+    public string MuteButtonText => _controls?.Muted == true ? "Reativar" : "Silenciar";
+    public string MuteStatus => _controls switch
     {
-        try { Peak = Session.AudioMeterInformation.MasterPeakValue * 100; } catch { }
-        try { Volume = (int)Math.Round(Session.SimpleAudioVolume.Volume * 100); } catch { }
+        { Muted: true } => "Silenciado",
+        { Muted: false } => "Mudo desligado",
+        _ => "Sem leitura",
+    };
+    public bool CanMute => _controls != null;
+    public bool CanLowerVolume => _controls is { Volume: > 0 };
+    public bool CanRaiseVolume => _controls is { Volume: < 100 };
+
+    internal void RefreshPeak()
+    {
+        try { Peak = Math.Round((Session.AudioMeterInformation?.MasterPeakValue ?? 0) * 100); }
+        catch (COMException) { Peak = 0; }
+    }
+
+    internal void RefreshVolume()
+    {
+        (int, bool)? controls;
+        try
+        {
+            var volume = Session.SimpleAudioVolume;
+            controls = volume == null ? null : (AudioService.VolumePercent(volume.Volume), volume.Mute);
+        }
+        catch (COMException) { controls = null; }
+        SetVolumeState(controls);
+    }
+
+    private void SetVolumeState((int Volume, bool Muted)? controls)
+    {
+        if (_controls == controls) return;
+        var previous = _controls;
+        _controls = controls;
+        if (previous?.Volume != controls?.Volume)
+        {
+            Raise(nameof(VolumeText));
+            Raise(nameof(CanLowerVolume));
+            Raise(nameof(CanRaiseVolume));
+        }
+        if (previous?.Muted != controls?.Muted)
+        {
+            Raise(nameof(MuteButtonText));
+            Raise(nameof(MuteStatus));
+        }
+        if (previous.HasValue != controls.HasValue) Raise(nameof(CanMute));
+    }
+
+    internal bool ToggleMute() => ChangeVolume(volume =>
+    {
+        var muted = !volume.Mute;
+        volume.Mute = muted;
+        return (null, muted);
+    });
+
+    internal bool AdjustVolume(int steps) => ChangeVolume(volume =>
+    {
+        var percent = Math.Clamp(AudioService.VolumePercent(volume.Volume) + steps, 0, 100);
+        volume.Volume = percent / 100f;
+        return (percent, null);
+    });
+
+    private bool ChangeVolume(Func<SimpleAudioVolume, (int? Volume, bool? Muted)> apply)
+    {
+        try
+        {
+            if (Session.State == NAudio.CoreAudioApi.Interfaces.AudioSessionState.AudioSessionStateExpired ||
+                Session.SimpleAudioVolume is not { } volume)
+            {
+                SetVolumeState(null);
+                return false;
+            }
+            var requested = apply(volume);
+            RefreshVolume();
+            return _controls is { } actual &&
+                (requested.Volume is null || requested.Volume == actual.Volume) &&
+                (requested.Muted is null || requested.Muted == actual.Muted);
+        }
+        catch (COMException) { }
+        RefreshVolume();
+        return false;
     }
 
     public void Dispose() => Session.Dispose();
@@ -160,10 +247,11 @@ public static class AudioService
     public static bool IsVirtualName(string text) =>
         VirtualKeywords.Any(k => text.Contains(k, StringComparison.OrdinalIgnoreCase));
 
+    internal static int VolumePercent(float scalar) => (int)Math.Round(Math.Clamp(scalar, 0, 1) * 100);
+
     public static (List<AudioDevice> Devices, List<AudioApp> Apps) Load()
     {
         var devices = new List<AudioDevice>();
-        var apps = new List<AudioApp>();
         using var enumerator = new MMDeviceEnumerator();
         string? DefaultId(DataFlow flow)
         {
@@ -187,11 +275,24 @@ public static class AudioService
                 continue;
             }
             devices.Add(device);
-            if (device.IsInput) continue;
+        }
+        // Saídas antes de entradas; em cada grupo: padrão, depois físicos, depois virtuais.
+        var sorted = devices.OrderBy(d => d.IsInput).ThenByDescending(d => d.IsDefault).ThenBy(d => d.IsVirtual).ThenBy(d => d.Name).ToList();
+        return (sorted, LoadApps(sorted, refreshSessions: false));
+    }
+
+    internal static List<AudioApp> LoadApps(IEnumerable<AudioDevice> devices, bool refreshSessions = true)
+    {
+        var apps = new List<AudioApp>();
+        foreach (var device in devices.Where(d => !d.IsInput))
+        {
             try
             {
-                var sessions = d.AudioSessionManager.Sessions;
-                for (var i = 0; i < sessions.Count; i++)
+                var manager = device.Device.AudioSessionManager;
+                if (refreshSessions) manager.RefreshSessions();
+                var sessions = manager.Sessions;
+                var count = sessions.Count;
+                for (var i = 0; i < count; i++)
                 {
                     var s = sessions[i];
                     var retained = false;
@@ -199,9 +300,7 @@ public static class AudioService
                     {
                         // "Sons do sistema" existe em todo dispositivo e só polui a lista.
                         if (s.IsSystemSoundsSession || s.State == NAudio.CoreAudioApi.Interfaces.AudioSessionState.AudioSessionStateExpired) continue;
-                        var app = new AudioApp(s, device);
-                        if (apps.Any(a => a.Pid == app.Pid && a.DeviceId == app.DeviceId)) continue;
-                        apps.Add(app);
+                        apps.Add(new AudioApp(s, device));
                         retained = true;
                     }
                     catch { } // a sessão pode desaparecer enquanto é listada
@@ -210,8 +309,7 @@ public static class AudioService
             }
             catch { }
         }
-        // Saídas antes de entradas; em cada grupo: padrão, depois físicos, depois virtuais.
-        return (devices.OrderBy(d => d.IsInput).ThenByDescending(d => d.IsDefault).ThenBy(d => d.IsVirtual).ThenBy(d => d.Name).ToList(), apps);
+        return apps.OrderBy(app => app.Name).ThenBy(app => app.Device).ToList();
     }
 
     public static int InactiveCount()

@@ -1,8 +1,10 @@
 using System.Security.Principal;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using SoNexus.Services;
 using SoNexus.Views;
+using Screen = System.Windows.Forms.Screen;
 
 namespace SoNexus;
 
@@ -16,6 +18,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        IsVisibleChanged += (_, _) => UpdateSensorPolling();
 
         var admin = new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
         AdminText.Text = admin ? "● Administrador" : "● Sem administrador — sensores limitados";
@@ -23,8 +26,8 @@ public partial class MainWindow : Window
 
         var v = typeof(MainWindow).Assembly.GetName().Version;
         VersionText.Text = $"por SoStudio · v{v?.Major}.{v?.Minor}";
-        LoadBounds();
         ApplyScale();
+        LoadBounds();
         HardwareService.Instance.IntervalMs = AppSettings.Current.SensorIntervalMs;
         _tray = new TrayIcon(this);
 
@@ -64,6 +67,22 @@ public partial class MainWindow : Window
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
+        const int wmSysCommand = 0x0112, scMinimize = 0xF020, wmDisplayChange = 0x007E;
+        if (msg == wmSysCommand && (wParam.ToInt64() & 0xFFF0) == scMinimize &&
+            AppSettings.Current.MinimizeToTray && !App.Exiting)
+        {
+            handled = true;
+            QueueHideToTray(requireMinimized: false);
+            return IntPtr.Zero;
+        }
+        if (msg == wmDisplayChange)
+        {
+            Dispatcher.BeginInvoke(() =>
+            {
+                if (IsVisible && WindowState != WindowState.Minimized && !App.Exiting)
+                    RecoverBounds();
+            }, DispatcherPriority.Background);
+        }
         if (msg != 0x0312) return IntPtr.Zero; // WM_HOTKEY
         handled = true;
         if (wParam.ToInt32() == HotkeyShow)
@@ -87,34 +106,79 @@ public partial class MainWindow : Window
 
     // ---------- Tamanho e posição ----------
 
+    private WindowState _restoreState;
+
     private void LoadBounds()
     {
         var s = AppSettings.Current;
-        Width = Math.Max(MinWidth, s.WindowWidth);
-        Height = Math.Max(MinHeight, s.WindowHeight);
-        // Só usa a posição salva se ainda estiver numa tela (monitor pode ter sido desligado).
-        if (s.WindowLeft is { } left && s.WindowTop is { } top &&
-            left >= SystemParameters.VirtualScreenLeft - 50 &&
-            left < SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth - 200 &&
-            top >= SystemParameters.VirtualScreenTop - 10 &&
-            top < SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight - 100)
-        {
-            WindowStartupLocation = WindowStartupLocation.Manual;
-            Left = left;
-            Top = top;
-        }
-        if (s.WindowMaximized) WindowState = WindowState.Maximized;
+        var width = double.IsFinite(s.WindowWidth) ? Math.Max(MinWidth, s.WindowWidth) : Width;
+        var height = double.IsFinite(s.WindowHeight) ? Math.Max(MinHeight, s.WindowHeight) : Height;
+        Rect bounds = new(s.WindowLeft ?? double.NaN, s.WindowTop ?? double.NaN, width, height);
+        ApplyBounds(VisibleBounds(bounds));
+        _restoreState = s.WindowMaximized ? WindowState.Maximized : WindowState.Normal;
+        WindowState = _restoreState;
     }
+
+    private Rect NormalBounds() =>
+        WindowState == WindowState.Normal ? new Rect(Left, Top, Width, Height) : RestoreBounds;
+
+    private void RecoverBounds()
+    {
+        var current = NormalBounds();
+        if (current.IsEmpty) return;
+        var bounds = VisibleBounds(current);
+        if (bounds != current) ApplyBounds(bounds);
+    }
+
+    private void ApplyBounds(Rect bounds)
+    {
+        WindowStartupLocation = WindowStartupLocation.Manual;
+        Width = bounds.Width;
+        Height = bounds.Height;
+        Left = bounds.Left;
+        Top = bounds.Top;
+    }
+
+    private Rect VisibleBounds(Rect bounds)
+    {
+        var scale = 96.0 / GetDpiForSystem();
+        Rect ToDips(System.Drawing.Rectangle area) =>
+            new(area.Left * scale, area.Top * scale, area.Width * scale, area.Height * scale);
+        var areas = Screen.AllScreens.Select(screen => ToDips(screen.WorkingArea)).ToArray();
+        var primary = Screen.PrimaryScreen is { } screen ? ToDips(screen.WorkingArea) : SystemParameters.WorkArea;
+        return KeepWindowVisible(bounds, areas, primary, MinWidth, MinHeight);
+    }
+
+    internal static Rect KeepWindowVisible(Rect bounds, IReadOnlyList<Rect> workAreas, Rect fallback,
+        double minWidth, double minHeight)
+    {
+        if (double.IsFinite(bounds.Left) && double.IsFinite(bounds.Top))
+        {
+            var title = new Rect(bounds.Left, bounds.Top, bounds.Width, Math.Min(bounds.Height, 36));
+            foreach (var area in workAreas)
+            {
+                var visible = Rect.Intersect(title, area);
+                if (visible.Width >= Math.Min(160, bounds.Width) && visible.Height >= Math.Min(18, title.Height))
+                    return bounds;
+            }
+        }
+
+        var width = Math.Max(minWidth, Math.Min(bounds.Width, fallback.Width));
+        var height = Math.Max(minHeight, Math.Min(bounds.Height, fallback.Height));
+        return new Rect(fallback.Left + Math.Max(0, fallback.Width - width) / 2,
+            fallback.Top + Math.Max(0, fallback.Height - height) / 2, width, height);
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern uint GetDpiForSystem();
 
     private void SaveBounds()
     {
         var s = AppSettings.Current;
-        var b = WindowState == WindowState.Normal ? new Rect(Left, Top, Width, Height) : RestoreBounds;
-        if (b.Width > 0 && double.IsFinite(b.Left) && double.IsFinite(b.Top))
-        {
+        var b = NormalBounds();
+        if (b.Width > 0 && b.Height > 0 && double.IsFinite(b.Left) && double.IsFinite(b.Top))
             (s.WindowLeft, s.WindowTop, s.WindowWidth, s.WindowHeight) = (b.Left, b.Top, b.Width, b.Height);
-            s.WindowMaximized = WindowState == WindowState.Maximized;
-        }
+        s.WindowMaximized = _restoreState == WindowState.Maximized;
         s.Save();
     }
 
@@ -124,8 +188,12 @@ public partial class MainWindow : Window
 
     public void HideToTray(bool showHint)
     {
-        SaveBounds();
-        Hide();
+        if (App.Exiting) return;
+        if (IsVisible)
+        {
+            SaveBounds();
+            Hide();
+        }
         HardwareService.Instance.Minimized = true;
         if (showHint && !AppSettings.Current.TrayHintShown && _tray != null)
         {
@@ -138,12 +206,11 @@ public partial class MainWindow : Window
 
     public void ShowFromTray()
     {
-        Show();
-        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
-        HardwareService.Instance.Minimized = false;
+        if (App.Exiting) return;
+        RecoverBounds();
+        if (WindowState == WindowState.Minimized) WindowState = _restoreState;
+        if (!IsVisible) Show();
         Activate();
-        Topmost = true;  // traz para frente mesmo com outra janela em foco
-        Topmost = false;
     }
 
     /// <summary>Abre uma página (e uma aba dela), ex.: atalhos do menu da bandeja.</summary>
@@ -172,20 +239,29 @@ public partial class MainWindow : Window
 
     private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
-        if (!App.Exiting && AppSettings.Current.CloseToTray)
+        if (App.Exiting)
         {
-            e.Cancel = true;
-            HideToTray(showHint: true);
+            SaveBounds();
             return;
         }
-        SaveBounds();
-        App.ExitCompletely();
+
+        e.Cancel = true;
+        if (AppSettings.Current.CloseToTray) HideToTray(showHint: true);
+        else Dispatcher.BeginInvoke(App.ExitCompletely);
     }
 
-    private void Quit_Click(object sender, RoutedEventArgs e)
+    private void Quit_Click(object sender, RoutedEventArgs e) => App.ExitCompletely();
+
+    protected override void OnClosed(EventArgs e)
     {
-        SaveBounds();
-        App.ExitCompletely();
+        if (_source is { IsDisposed: false })
+        {
+            UnregisterHotKey(_source.Handle, HotkeyShow);
+            UnregisterHotKey(_source.Handle, HotkeyOverlay);
+            _source.RemoveHook(WndProc);
+        }
+        _source = null;
+        base.OnClosed(e);
     }
 
     /// <summary>Barra de título preta (modo escuro do Windows + cor da legenda no Windows 11).</summary>
@@ -205,12 +281,22 @@ public partial class MainWindow : Window
     /// <summary>Minimizado, os sensores atualizam devagar para economizar CPU (e pode ir para a bandeja).</summary>
     private void OnStateChanged(object? sender, EventArgs e)
     {
-        HardwareService.Instance.Minimized = WindowState == WindowState.Minimized;
-        if (WindowState == WindowState.Minimized && AppSettings.Current.MinimizeToTray)
+        var minimized = WindowState == WindowState.Minimized;
+        if (!minimized) _restoreState = WindowState;
+        UpdateSensorPolling();
+        if (minimized && AppSettings.Current.MinimizeToTray)
+            QueueHideToTray(requireMinimized: true);
+    }
+
+    private void UpdateSensorPolling() => HardwareService.Instance.Minimized = WindowState == WindowState.Minimized || !IsVisible;
+
+    private void QueueHideToTray(bool requireMinimized)
+    {
+        Dispatcher.BeginInvoke(() =>
         {
-            WindowState = WindowState.Normal; // volta ao normal escondido, para abrir certo depois
-            HideToTray(showHint: true);
-        }
+            if (IsVisible && (!requireMinimized || WindowState == WindowState.Minimized))
+                HideToTray(showHint: true);
+        }, DispatcherPriority.Input);
     }
 
     [System.Runtime.InteropServices.DllImport("dwmapi.dll")]

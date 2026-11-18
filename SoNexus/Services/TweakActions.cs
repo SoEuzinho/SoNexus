@@ -21,6 +21,7 @@ public abstract class TweakAction
 
 public sealed class Tweak
 {
+    private static readonly object OperationGate = new();
     /// <summary>Identificador estável (usado para exportar/importar as escolhas).</summary>
     public required string Id { get; init; }
     public required string Category { get; init; }
@@ -38,21 +39,41 @@ public sealed class Tweak
     /// <summary>Aplicado pelo SoNexus (tem backup do original). Ajustes que a pessoa fez por conta própria ficam de fora.</summary>
     public bool AppliedBySoNexus => Actions.Any(a => a.HasBackup);
 
-    public string Note => Restart switch
-    {
-        Restart.Explorer => "reinicie o Explorer",
-        Restart.Windows => "requer reiniciar o PC",
-        _ => "",
-    };
+    public string Note => Actions.Any(action => action is OptionalFeature)
+        ? "reinicie o PC · dependências podem permanecer após reverter"
+        : Restart switch
+        {
+            Restart.Explorer => "reinicie o Explorer",
+            Restart.Windows => "requer reiniciar o PC",
+            _ => "",
+        };
 
     public void Apply()
     {
-        foreach (var a in Actions.Where(a => a.IsAvailable)) a.Apply();
+        lock (OperationGate)
+            foreach (var a in Actions.Where(a => a.IsAvailable && !a.IsApplied())) a.Apply();
     }
 
     public void Revert()
     {
-        foreach (var a in Actions.Where(a => a.IsAvailable)) a.Revert();
+        lock (OperationGate)
+            foreach (var a in Actions.Where(a => a.IsAvailable)) a.Revert();
+    }
+
+    public void RevertOriginal()
+    {
+        lock (OperationGate)
+        {
+            var actions = Actions.Where(a => a.HasBackup).Reverse().ToList();
+            if (actions.Count == 0) throw new InvalidOperationException("Nenhuma ação tem backup do valor original.");
+            var failures = new List<Exception>();
+            foreach (var action in actions)
+            {
+                try { action.Revert(); }
+                catch (Exception ex) { failures.Add(ex); }
+            }
+            if (failures.Count > 0) throw new AggregateException("Falhou a restauração de uma ou mais ações.", failures);
+        }
     }
 }
 
@@ -114,6 +135,17 @@ internal static class Reg
         (hive, path) = Map(hive, path);
         using var root = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
         root.DeleteSubKeyTree(path, throwOnMissingSubKey: false);
+    }
+
+    public static void DeleteEmptyKey(RegistryHive hive, string path)
+    {
+        (hive, path) = Map(hive, path);
+        using var root = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
+        using (var key = root.OpenSubKey(path))
+        {
+            if (key == null || key.SubKeyCount != 0 || key.ValueCount != 0) return;
+        }
+        root.DeleteSubKey(path, throwOnMissingSubKey: false);
     }
 
     /// <summary>Caminho completo para o reg.exe (HKCU vira HKU\SID quando for outra conta).</summary>
@@ -313,6 +345,9 @@ public sealed class RegValue(RegistryHive hive, string path, string name, object
 /// <summary>Cria uma chave (aplicado) ou apaga a árvore dela (padrão).</summary>
 public sealed class RegKey(RegistryHive hive, string path, string deletePath) : TweakAction
 {
+    private string Id => $"Key|{Reg.FullName(hive, path)}";
+    public override bool HasBackup => TweakBackup.Contains(Id);
+
     public override bool IsApplied()
     {
         using var k = Reg.Open(hive, path);
@@ -321,11 +356,24 @@ public sealed class RegKey(RegistryHive hive, string path, string deletePath) : 
 
     public override void Apply()
     {
+        using (var parent = Reg.Open(hive, deletePath))
+            TweakBackup.Remember(Id, parent != null ? 1 : 0, RegistryValueKind.DWord);
         using var k = Reg.Create(hive, path);
         k.SetValue("", "");
     }
 
-    public override void Revert() => Reg.DeleteTree(hive, deletePath);
+    public override void Revert()
+    {
+        if (TweakBackup.TryRestore(Id, (_, original, _) =>
+            {
+                using (var key = Reg.Open(hive, path, writable: true))
+                    if (key?.GetValue("") is string text && text.Length == 0)
+                        key.DeleteValue("", throwOnMissingValue: false);
+                Reg.DeleteEmptyKey(hive, path);
+                if (original is 0) Reg.DeleteEmptyKey(hive, deletePath);
+            })) return;
+        Reg.DeleteTree(hive, deletePath);
+    }
 }
 
 /// <summary>
@@ -355,9 +403,23 @@ public sealed class RegKeyRemove(string id, params (RegistryHive Hive, string Pa
         {
             var (hive, path) = keys[i];
             if (!Exists(keys[i])) continue;
-            var (code, _, err) = ProcessRunner.RunAsync("reg.exe", $"export \"{Reg.FullName(hive, path)}\" \"{BackupFile(i)}\" /y").GetAwaiter().GetResult();
-            // Sem backup não apaga: senão "Reverter" não teria como voltar.
-            if (code != 0 || !File.Exists(BackupFile(i))) throw new InvalidOperationException($"não foi possível fazer backup de {path}: {err.Trim()}");
+            var backup = BackupFile(i);
+            if (!File.Exists(backup))
+            {
+                var temporary = $"{backup}.{Guid.NewGuid():N}.tmp";
+                try
+                {
+                    var (code, _, err) = ProcessRunner.RunAsync(Path.Combine(Environment.SystemDirectory, "reg.exe"),
+                        $"export \"{Reg.FullName(hive, path)}\" \"{temporary}\" /y").GetAwaiter().GetResult();
+                    if (code != 0 || !File.Exists(temporary))
+                        throw new InvalidOperationException($"não foi possível fazer backup de {path}: {err.Trim()}");
+                    File.Move(temporary, backup);
+                }
+                finally
+                {
+                    try { File.Delete(temporary); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+                }
+            }
             Reg.DeleteTree(hive, path);
         }
     }
@@ -367,8 +429,12 @@ public sealed class RegKeyRemove(string id, params (RegistryHive Hive, string Pa
         for (var i = 0; i < keys.Length; i++)
         {
             if (!File.Exists(BackupFile(i))) continue;
-            ProcessRunner.RunAsync("reg.exe", $"import \"{BackupFile(i)}\"").GetAwaiter().GetResult();
-            File.Delete(BackupFile(i));
+            var backup = BackupFile(i);
+            var (code, _, err) = ProcessRunner.RunAsync(Path.Combine(Environment.SystemDirectory, "reg.exe"),
+                $"import \"{backup}\"").GetAwaiter().GetResult();
+            if (code != 0 || !Exists(keys[i]))
+                throw new InvalidOperationException($"não foi possível restaurar {keys[i].Path}: {err.Trim()} (código {code}).");
+            File.Delete(backup);
         }
     }
 }
@@ -376,7 +442,10 @@ public sealed class RegKeyRemove(string id, params (RegistryHive Hive, string Pa
 /// <summary>Desativa um serviço. defaultStart: auto, demand ou delayed-auto.</summary>
 public sealed class ServiceDisable(string service, string defaultStart) : TweakAction
 {
+    private sealed record Snapshot(string Mode, bool? WasRunning);
     private string KeyPath => $@"SYSTEM\CurrentControlSet\Services\{service}";
+    private string BackupId => $"Service|{service}";
+    public override bool HasBackup => TweakBackup.Contains(BackupId);
 
     public override bool IsAvailable
     {
@@ -395,11 +464,54 @@ public sealed class ServiceDisable(string service, string defaultStart) : TweakA
 
     public override void Apply()
     {
+        using (var key = Reg.Open(RegistryHive.LocalMachine, KeyPath))
+        {
+            if (key?.GetValue("Start") is not int start)
+                throw new InvalidOperationException($"Não foi possível ler a inicialização original de {service}.");
+            var delayed = key.GetValue("DelayedAutoStart") is 1;
+            var original = start switch
+            {
+                0 => "boot", 1 => "system", 2 => delayed ? "delayed-auto" : "auto",
+                3 => "demand", 4 => "disabled", _ => null,
+            };
+            if (original == null) throw new InvalidOperationException($"Tipo de inicialização desconhecido para {service}.");
+            TweakBackup.Remember(BackupId, JsonSerializer.Serialize(new Snapshot(original, Running())), RegistryValueKind.String);
+        }
         Check(ProcessRunner.Sc($"config {service} start= disabled"));
-        ProcessRunner.Sc($"stop {service}");
+        var stop = ProcessRunner.Sc($"stop {service}");
+        if (stop != 1062) Check(stop); // serviço já parado
     }
 
-    public override void Revert() => Check(ProcessRunner.Sc($"config {service} start= {defaultStart}"));
+    public override void Revert()
+    {
+        if (TweakBackup.TryRestore(BackupId, (_, original, _) =>
+            {
+                if (original is not string saved || JsonSerializer.Deserialize<Snapshot>(saved) is not { } snapshot ||
+                    snapshot.Mode is not ("boot" or "system" or "auto" or "delayed-auto" or "demand" or "disabled"))
+                    throw new InvalidDataException($"Backup inválido para {service}.");
+                Check(ProcessRunner.Sc($"config {service} start= {snapshot.Mode}"));
+                if (snapshot.WasRunning == true)
+                {
+                    var start = ProcessRunner.Sc($"start {service}");
+                    if (start != 1056) Check(start); // serviço já em execução
+                }
+            })) return;
+        Check(ProcessRunner.Sc($"config {service} start= {defaultStart}"));
+    }
+
+    private bool? Running()
+    {
+        try
+        {
+            using var query = new System.Management.ManagementObjectSearcher($"SELECT Started FROM Win32_Service WHERE Name='{service}'");
+            foreach (System.Management.ManagementObject result in query.Get())
+            {
+                using (result) return result["Started"] as bool?;
+            }
+        }
+        catch (Exception ex) { AppLog.Write($"Estado do serviço {service}: {ex.Message}"); }
+        return null;
+    }
 
     private void Check(int code)
     {
@@ -410,16 +522,21 @@ public sealed class ServiceDisable(string service, string defaultStart) : TweakA
 /// <summary>Liga um recurso opcional do Windows (Sandbox, WSL...). "Reverter" desliga.</summary>
 public sealed class OptionalFeature(params string[] features) : TweakAction
 {
-    private static readonly Dictionary<string, string> States = new();
+    private static readonly Dictionary<string, (string State, DateTimeOffset CheckedAt)> States = new();
+    private static string BackupId(string feature) => $"Feature|{feature}";
+    public override bool HasBackup => features.Any(feature => TweakBackup.Contains(BackupId(feature)));
 
     private string State(string feature)
     {
         lock (States)
         {
-            if (States.TryGetValue(feature, out var s)) return s;
-            var (_, output, _) = ProcessRunner.PowerShellAsync(
-                $"(Get-WindowsOptionalFeature -Online -FeatureName {feature} -ErrorAction SilentlyContinue).State").GetAwaiter().GetResult();
-            return States[feature] = output.Trim();
+            if (States.TryGetValue(feature, out var saved) && DateTimeOffset.UtcNow - saved.CheckedAt < TimeSpan.FromSeconds(10))
+                return saved.State;
+            var (code, output, _) = ProcessRunner.PowerShellAsync(
+                $"(Get-WindowsOptionalFeature -Online -FeatureName {ProcessRunner.Quote(feature)} -ErrorAction Stop).State").GetAwaiter().GetResult();
+            var state = code == 0 ? output.Trim() : "";
+            States[feature] = (state, DateTimeOffset.UtcNow);
+            return state;
         }
     }
 
@@ -428,18 +545,45 @@ public sealed class OptionalFeature(params string[] features) : TweakAction
     // "EnablePending" = ativado, só falta reiniciar o PC.
     public override bool IsApplied() => features.All(f => State(f) is "Enabled" or "EnablePending");
 
-    public override void Apply() => Run("Enable-WindowsOptionalFeature", "-All");
-
-    public override void Revert() => Run("Disable-WindowsOptionalFeature", "");
-
-    private void Run(string cmd, string extra)
+    public override void Apply()
     {
-        foreach (var f in features)
+        var toEnable = new List<string>();
+        foreach (var feature in features)
         {
-            var (code, _, err) = ProcessRunner.PowerShellAsync($"{cmd} -Online -FeatureName {f} {extra} -NoRestart -ErrorAction Stop | Out-Null")
-                .GetAwaiter().GetResult();
-            lock (States) States.Remove(f);
-            if (code != 0) throw new InvalidOperationException(err.Trim().Split('\n')[0]);
+            var original = State(feature);
+            if (original is "Enabled" or "EnablePending") continue;
+            if (original is not ("Disabled" or "DisabledWithPayloadRemoved"))
+                throw new InvalidOperationException($"Estado de {feature}: {original}. Verifique se há reinício pendente.");
+            TweakBackup.Remember(BackupId(feature), original, RegistryValueKind.String);
+            toEnable.Add(feature);
         }
+        foreach (var feature in toEnable)
+            Run(feature, "Enable-WindowsOptionalFeature", "-All");
+    }
+
+    public override void Revert()
+    {
+        if (!HasBackup)
+        {
+            foreach (var feature in features.Reverse()) Run(feature, "Disable-WindowsOptionalFeature", "");
+            return;
+        }
+        foreach (var feature in features.Reverse())
+            TweakBackup.TryRestore(BackupId(feature), (_, original, _) =>
+            {
+                if (original is not ("Disabled" or "DisabledWithPayloadRemoved"))
+                    throw new InvalidDataException($"Backup inválido para {feature}.");
+                if (!Equals(State(feature), original))
+                    Run(feature, "Disable-WindowsOptionalFeature", original is "DisabledWithPayloadRemoved" ? "-Remove" : "");
+            });
+    }
+
+    private static void Run(string feature, string cmd, string extra)
+    {
+        var (code, _, err) = ProcessRunner.PowerShellAsync(
+            $"{cmd} -Online -FeatureName {ProcessRunner.Quote(feature)} {extra} -NoRestart -ErrorAction Stop | Out-Null")
+            .GetAwaiter().GetResult();
+        lock (States) States.Clear(); // -All pode ativar dependências consultadas antes
+        if (code != 0) throw new InvalidOperationException($"{feature}: {err.Trim()} (código {code}).");
     }
 }

@@ -8,8 +8,9 @@ public sealed class TweakItem : ObservableObject
     private static readonly Brush Muted = Freeze(new SolidColorBrush(Color.FromRgb(0x5C, 0x5C, 0x5C)));
 
     private bool _isSelected;
-    private bool _isAvailable = true;
+    private bool _isAvailable;
     private bool _isApplied;
+    private bool _hasBackup;
     private string _statusText = "…";
     private Brush _statusBrush = Muted;
 
@@ -27,30 +28,43 @@ public sealed class TweakItem : ObservableObject
     public bool IsSelected { get => _isSelected; set => Set(ref _isSelected, value); }
     public bool IsAvailable { get => _isAvailable; private set => Set(ref _isAvailable, value); }
     public bool IsApplied { get => _isApplied; private set => Set(ref _isApplied, value); }
+    public bool HasBackup { get => _hasBackup; private set => Set(ref _hasBackup, value); }
+    public bool CanSelect => IsAvailable || HasBackup;
     public string StatusText { get => _statusText; private set => Set(ref _statusText, value); }
     public Brush StatusBrush { get => _statusBrush; private set => Set(ref _statusBrush, value); }
 
     /// <summary>Lê o estado no sistema (pode demorar: rodar fora da janela).</summary>
-    public (bool Available, bool Applied) ReadState()
+    public (bool Available, bool Applied, bool HasBackup) ReadState()
     {
+        var hasBackup = false;
         try
         {
+            hasBackup = Tweak.AppliedBySoNexus;
             var available = Tweak.IsAvailable;
-            return (available, available && Tweak.IsApplied);
+            return (available, available && Tweak.IsApplied, hasBackup);
         }
         catch
         {
-            return (false, false);
+            return (false, false, hasBackup);
         }
     }
 
-    public void SetState((bool Available, bool Applied) state)
+    public void SetState((bool Available, bool Applied, bool HasBackup) state)
     {
         IsAvailable = state.Available;
         IsApplied = state.Applied;
-        StatusText = !IsAvailable ? "Indisponível" : IsApplied ? "Aplicado" : "Padrão do Windows";
+        HasBackup = state.HasBackup;
+        Raise(nameof(CanSelect));
+        StatusText = (IsAvailable, IsApplied, HasBackup) switch
+        {
+            (_, true, true) => "Aplicado · com backup",
+            (_, true, false) => "Já estava aplicado",
+            (_, false, true) => "Original recuperável",
+            (false, false, false) => "Indisponível",
+            _ => "Não aplicado",
+        };
         StatusBrush = IsApplied ? Metric.Ok : Muted;
-        if (!IsAvailable) IsSelected = false;
+        if (!CanSelect) IsSelected = false;
     }
 
     private static Brush Freeze(Brush b) { b.Freeze(); return b; }

@@ -48,6 +48,7 @@
     <!-- Termos: arquivo ao lado do .exe (instalador) e embutido (a tela de aceite nunca fica sem o texto). -->
     <None Include="TERMOS-E-PRIVACIDADE.txt" CopyToOutputDirectory="PreserveNewest" />
     <EmbeddedResource Include="TERMOS-E-PRIVACIDADE.txt" LogicalName="SoNexus.Termos.txt" />
+    <EmbeddedResource Include="GUIA.txt" LogicalName="SoNexus.Guia.txt" />
     <!-- Instalador oficial e assinado do driver PawnIO (namazso), usado pelos sensores da CPU/placa-mãe. -->
     <EmbeddedResource Include="Assets\PawnIO_setup.exe" LogicalName="SoNexus.PawnIO_setup.exe" />
   </ItemGroup>

@@ -33,7 +33,7 @@ public static class Authenticode
             : $"assinado por \"{subject.Split('|')[0].Trim()}\", que não é o fabricante esperado";
     }
 
-    private static bool IsTrusted(string file)
+    internal static bool IsTrusted(string file, bool cachedOnly = false)
     {
         var fileInfo = new WINTRUST_FILE_INFO
         {
@@ -41,24 +41,27 @@ public static class Authenticode
             pcwszFilePath = file,
         };
         var fileInfoPtr = Marshal.AllocHGlobal(Marshal.SizeOf<WINTRUST_FILE_INFO>());
+        var marshaled = false;
         try
         {
             Marshal.StructureToPtr(fileInfo, fileInfoPtr, false);
+            marshaled = true;
             var data = new WINTRUST_DATA
             {
                 cbStruct = (uint)Marshal.SizeOf<WINTRUST_DATA>(),
                 dwUIChoice = 2,           // WTD_UI_NONE
-                fdwRevocationChecks = 0,  // WTD_REVOKE_NONE (sem internet também funciona)
+                fdwRevocationChecks = 0,  // WTD_REVOKE_NONE (sem verificações adicionais)
                 dwUnionChoice = 1,        // WTD_CHOICE_FILE
                 pFile = fileInfoPtr,
                 dwStateAction = 0,
-                dwProvFlags = 0x80,       // WTD_CACHE_ONLY_URL_RETRIEVAL
+                dwProvFlags = 0x80u | (cachedOnly ? 0x1000u : 0u), // CHAIN_EXCLUDE_ROOT | CACHE_ONLY_URL_RETRIEVAL
             };
             var action = new Guid("00AAC56B-CD44-11d0-8CC2-00C04FC295EE"); // WINTRUST_ACTION_GENERIC_VERIFY_V2
             return WinVerifyTrust(IntPtr.Zero, ref action, ref data) == 0;
         }
         finally
         {
+            if (marshaled) Marshal.DestroyStructure<WINTRUST_FILE_INFO>(fileInfoPtr);
             Marshal.FreeHGlobal(fileInfoPtr);
         }
     }

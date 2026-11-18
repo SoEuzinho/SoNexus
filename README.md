@@ -34,8 +34,9 @@ Criado por **SoEuzinho** · **SoStudio**
 | **Desempenho** | Executar benchmarks de CPU, GPU, memória e disco, comparar resultados e usar testes de carga com proteção térmica. Consultar guias de BIOS, EXPO e PBO. |
 | **Drivers** | Consultar versões instaladas, buscar drivers de vídeo e remover pacotes selecionados. Exportar um backup antes da remoção e escolher um INF salvo para reinstalar. |
 | **Diagnóstico** | Consultar falhas e telas azuis registradas pelo Windows, investigar latência DPC e gerar um relatório de suporte local com prévia. |
-| **Otimização** | Gerenciar inicialização, modificar ajustes do Windows com opções de reversão, limpar temporários, testar o monitor e instalar programas via WinGet. |
-| **Rede e áudio** | Acompanhar tráfego por aplicativo, testar rotas e DNS, ajustar volumes e integrar o Voicemeeter. |
+| **Otimização** | Revisar e aplicar ajustes do Windows, restaurar valores com backup e gerenciar aplicativos pré-instalados separadamente. Inclui limpeza, teste de monitor e instalação via WinGet. |
+| **Rede e segurança** | Acompanhar tráfego por aplicativo, testar rotas e DNS e revisar sinais em processos, conexões e itens de inicialização. |
+| **Áudio** | Medir entradas e saídas, alterar volume e mudo por sessão e integrar o Voicemeeter. |
 | **Iluminação** | Controlar dispositivos compatíveis pelo OpenRGB ou fitas Bluetooth BJ_LED, com efeitos que reagem à música, à temperatura ou ao uso do PC. |
 
 **Como interpretar os dados de jogos.** O FPS ao vivo é calculado a partir das apresentações registradas pelo Windows via ETW. Os sinais de gargalo são inferidos a partir da telemetria do sistema durante a partida. As previsões da biblioteca e da tela por resolução usam requisitos e tabelas de referência.
@@ -61,6 +62,8 @@ O SoNexus requer **Windows 10 (1809 ou posterior) ou Windows 11, x64**. O instal
 | **Medir um jogo** | Abra **Jogos › FPS ao vivo**, inicie a medição e jogue por pelo menos 30 segundos. Consulte as sessões em **Seu PC e gargalo**. |
 | **Preparar uma instalação limpa do driver** | Abra **Drivers › Remover driver de vídeo**, confira os pacotes marcados e escolha onde guardar o backup. |
 | **Investigar travamentos** | Abra **Diagnóstico › Erros e telas azuis**. Na aba **Relatório de suporte**, revise a prévia antes de salvar. |
+| **Revisar um programa desconhecido** | Abra **Rede › Segurança** e analise os sinais locais. Use **Segurança do Windows** para verificar malware nos arquivos. |
+| **Consultar o manual e as DLLs** | Abra **Configurações › Sobre › Documentação e DLLs**. O inventário é lido da instalação em uso e pode ser filtrado. |
 
 ## Demonstração
 

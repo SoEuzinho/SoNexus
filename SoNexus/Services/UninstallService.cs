@@ -18,7 +18,7 @@ public static class UninstallService
 
     /// <summary>Ajustes do Windows que o SoNexus aplicou e sabe desfazer (têm backup do valor original).</summary>
     public static List<Tweak> AppliedTweaks() =>
-        DebloatService.Tweaks.Where(t => t.IsAvailable && t.AppliedBySoNexus).ToList();
+        DebloatService.Tweaks.Where(t => t.AppliedBySoNexus).ToList();
 
     /// <summary>Desfaz os ajustes, um por um. Retorna os que não deu para desfazer.</summary>
     public static List<string> RevertTweaks(Action<string> progress)
@@ -27,7 +27,7 @@ public static class UninstallService
         foreach (var t in AppliedTweaks())
         {
             progress($"Desfazendo: {t.Title}");
-            try { t.Revert(); }
+            try { t.RevertOriginal(); }
             catch (Exception ex)
             {
                 failed.Add(t.Title);

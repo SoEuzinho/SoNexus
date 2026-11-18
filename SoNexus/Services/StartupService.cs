@@ -109,13 +109,13 @@ public static class StartupService
         return list;
     }
 
-    public static Task<List<TaskInfo>> LoadTasksAsync() =>
+    public static Task<List<TaskInfo>> LoadTasksAsync(bool failOnError = false) =>
         ProcessRunner.PowerShellJsonAsync<TaskInfo>("""
             Get-ScheduledTask | ForEach-Object {
               $a = @($_.Actions | Where-Object { $_.Execute })[0]
               if ($a) { [pscustomobject]@{ Name="$($_.TaskName)"; Path="$($_.TaskPath)"; State="$($_.State)"; Exec="$($a.Execute)"; Args="$($a.Arguments)"; Author="$($_.Author)"; Hidden=[bool]$_.Settings.Hidden } }
             }
-            """);
+            """, failOnError);
 
     public static async Task<string?> SetEnabledAsync(StartupEntry e, bool enabled)
     {

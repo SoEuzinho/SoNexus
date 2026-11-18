@@ -633,16 +633,13 @@ public static class DebloatService
 
     public static async Task<string?> CreateRestorePointAsync()
     {
-        // O Windows só deixa criar 1 ponto a cada 24 h, a menos que essa trava seja zerada.
-        using (var k = Reg.Create(LM, @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore"))
-            k.SetValue("SystemRestorePointCreationFrequency", 0, RegistryValueKind.DWord);
-
-        var (code, _, error) = await ProcessRunner.PowerShellAsync(
-            "Checkpoint-Computer -Description 'SoNexus' -RestorePointType 'MODIFY_SETTINGS' -ErrorAction Stop");
+        var (code, output, error) = await ProcessRunner.PowerShellAsync(
+            "Checkpoint-Computer -Description 'SoNexus' -RestorePointType 'MODIFY_SETTINGS' -ErrorAction Stop -WarningAction Stop");
         if (code == 0) return null;
-        return string.IsNullOrWhiteSpace(error)
-            ? "Não foi possível criar o ponto. Verifique se a Proteção do Sistema está ativada no disco C:."
-            : error.Trim().Split('\n')[0];
+        var detail = string.IsNullOrWhiteSpace(error) ? output : error;
+        return string.IsNullOrWhiteSpace(detail)
+            ? "Não foi possível criar o ponto. Verifique a Proteção do Sistema ou se já existe um ponto recente."
+            : detail.Trim().Split('\n')[0];
     }
 
     public static void RestartExplorer()
@@ -785,11 +782,14 @@ public static class DebloatService
 
     public static async Task<List<BloatApp>> GetBloatAppsAsync()
     {
-        var installed = await ProcessRunner.PowerShellJsonAsync<AppxDto>(
-            """Get-AppxPackage -AllUsers | Where-Object { -not $_.NonRemovable -and -not $_.IsFramework } | Select-Object @{n='Name';e={"$($_.Name)"}}, @{n='Version';e={"$($_.Version)"}}""");
+        var (code, output, error) = await ProcessRunner.PowerShellAsync(
+            """$ErrorActionPreference='Stop'; ConvertTo-Json -Compress -InputObject @(Get-AppxPackage -AllUsers | Where-Object { -not $_.NonRemovable -and -not $_.IsFramework } | Select-Object @{n='Name';e={"$($_.Name)"}}, @{n='Version';e={"$($_.Version)"}})""");
+        if (code != 0)
+            throw new InvalidOperationException(string.IsNullOrWhiteSpace(error) ? $"PowerShell retornou {code}." : error.Trim().Split('\n')[0]);
+        var installed = JsonSerializer.Deserialize<List<AppxDto>>(output.Trim()) ?? new();
 
         var result = new List<BloatApp>();
-        foreach (var app in installed.DistinctBy(a => a.Name))
+        foreach (var app in installed.DistinctBy(a => a.Name, StringComparer.OrdinalIgnoreCase))
         {
             var match = AppCatalog.FirstOrDefault(c => app.Name.Equals(c.Id, StringComparison.OrdinalIgnoreCase))
                         is { Id: not null } exact ? exact
@@ -812,14 +812,17 @@ public static class DebloatService
     public static async Task<bool> RemoveAppAsync(string name)
     {
         var n = ProcessRunner.Quote(name);
-        var (_, output, _) = await ProcessRunner.PowerShellAsync($$"""
+        var (code, output, _) = await ProcessRunner.PowerShellAsync($$"""
+            $ErrorActionPreference = 'Stop'
             $n = {{n}}
             Get-AppxPackage -AllUsers -Name $n | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
             Get-AppxPackage -Name $n | Remove-AppxPackage -ErrorAction SilentlyContinue
             Get-AppxProvisionedPackage -Online | Where-Object DisplayName -eq $n | Remove-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue | Out-Null
-            if (Get-AppxPackage -Name $n) { 'FALHOU' } else { 'OK' }
+            $allUsers = @(Get-AppxPackage -AllUsers -Name $n -ErrorAction Stop)
+            $provisioned = @(Get-AppxProvisionedPackage -Online -ErrorAction Stop | Where-Object DisplayName -eq $n)
+            if ($allUsers.Count -eq 0 -and $provisioned.Count -eq 0) { 'OK' }
             """);
-        return output.Trim().EndsWith("OK");
+        return code == 0 && output.Trim().Equals("OK", StringComparison.Ordinal);
     }
 
     private static async Task<bool> RemoveWingetAsync(string id)
@@ -840,5 +843,6 @@ public static class DebloatService
         File.WriteAllText(path, JsonSerializer.Serialize(profile, new JsonSerializerOptions { WriteIndented = true }));
 
     public static DebloatProfile Import(string path) =>
-        JsonSerializer.Deserialize<DebloatProfile>(File.ReadAllText(path)) ?? new DebloatProfile(new(), new());
+        JsonSerializer.Deserialize<DebloatProfile>(File.ReadAllText(path)) is { Tweaks: not null, Apps: not null } profile
+            ? profile : throw new InvalidDataException("O perfil precisa ter as listas de ajustes e apps.");
 }

@@ -245,6 +245,8 @@ public partial class SettingsView : UserControl
 
     private void Terms_Click(object sender, RoutedEventArgs e) => new TermsWindow { Owner = Window.GetWindow(this) }.ShowDialog();
 
+    private void Help_Click(object sender, RoutedEventArgs e) => new HelpWindow { Owner = Window.GetWindow(this) }.ShowDialog();
+
     private void OpenLog_Click(object sender, RoutedEventArgs e)
     {
         var folder = Path.GetDirectoryName(AppLog.Path_)!;

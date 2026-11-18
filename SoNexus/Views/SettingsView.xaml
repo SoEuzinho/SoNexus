@@ -186,6 +186,7 @@
                         <TextBlock Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,12"
                                    Text="Kit de ferramentas para PC Windows: sensores, otimização, drivers, jogos, rede, áudio, diagnóstico e iluminação."/>
                         <WrapPanel>
+                            <Button Content="Documentação e DLLs" Margin="0,0,8,8" Click="Help_Click"/>
                             <Button Content="Termos de Uso e Privacidade" Margin="0,0,8,8" Click="Terms_Click"/>
                             <Button Content="Abrir pasta de registros (log)" Margin="0,0,8,8" Click="OpenLog_Click"/>
                             <Button Content="Licenças de terceiros" Margin="0,0,8,8" Click="Notices_Click"/>

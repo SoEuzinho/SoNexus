@@ -15,7 +15,7 @@
             <StackPanel Margin="0,0,200,0">
                 <TextBlock Text="Áudio" Style="{StaticResource H1}"/>
                 <TextBlock x:Name="Subtitle" Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,0" TextWrapping="Wrap"
-                           Text="Dispositivos de som, formato, latência e quais programas estão tocando agora."/>
+                           Text="Dispositivos de som e mixer de aplicativos do Windows."/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                 <Button Content="Configurações de som" Margin="0,0,8,0" Click="SoundPanel_Click"/>
@@ -45,7 +45,7 @@
                                     </Grid>
                                     <ProgressBar Style="{StaticResource Level}" Value="{Binding Peak, Mode=OneWay}" Margin="0,10,0,10"/>
                                     <TextBlock Style="{StaticResource Muted}">
-                                        <Run Text="{Binding Format, Mode=OneWay}"/>  ·  latência <Run Text="{Binding Latency, Mode=OneWay}"/>
+                                        <Run Text="{Binding Format, Mode=OneWay}"/> · período de áudio <Run Text="{Binding Latency, Mode=OneWay}"/>
                                     </TextBlock>
                                 </StackPanel>
                             </Border>
@@ -55,26 +55,45 @@
 
                 <Border Style="{StaticResource Card}" Margin="0,0,12,12">
                     <StackPanel>
-                        <TextBlock Text="PROGRAMAS TOCANDO SOM" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,8"/>
+                        <TextBlock Text="Mixer de aplicativos" Style="{StaticResource H2}" Margin="0,0,0,4"/>
+                        <TextBlock Text="Ajuste o volume ou o mudo de cada sessão de áudio do Windows."
+                                   Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,8"/>
                         <ItemsControl x:Name="AppList">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Grid Margin="0,4">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="200"/>
-                                            <ColumnDefinition/>
-                                            <ColumnDefinition Width="60"/>
-                                            <ColumnDefinition Width="220"/>
+                                            <ColumnDefinition Width="2*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/>
-                                        <ProgressBar Grid.Column="1" Style="{StaticResource Level}" Value="{Binding Peak, Mode=OneWay}" VerticalAlignment="Center" Margin="0,0,14,0"/>
-                                        <TextBlock Grid.Column="2" TextAlignment="Right"><Run Text="{Binding Volume, Mode=OneWay}"/>%</TextBlock>
-                                        <TextBlock Grid.Column="3" Text="{Binding Device}" Style="{StaticResource Muted}" Margin="14,0,0,0" TextTrimming="CharacterEllipsis"/>
+                                        <StackPanel Margin="0,0,12,0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding Device}" Style="{StaticResource Muted}" TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+                                        <ProgressBar Grid.Column="1" Style="{StaticResource Level}" Value="{Binding Peak, Mode=OneWay}"
+                                                     VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+                                            <Button Content="−" Tag="-5" ToolTip="Diminuir volume em 5 pontos"
+                                                    AutomationProperties.Name="Diminuir volume"
+                                                    IsEnabled="{Binding CanLowerVolume}" Click="AppVolume_Click"/>
+                                            <TextBlock Text="{Binding VolumeText}" TextAlignment="Center" Width="48" VerticalAlignment="Center"/>
+                                            <Button Content="+" Tag="5" ToolTip="Aumentar volume em 5 pontos"
+                                                    AutomationProperties.Name="Aumentar volume"
+                                                    IsEnabled="{Binding CanRaiseVolume}" Click="AppVolume_Click"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="3" VerticalAlignment="Center">
+                                            <Button Content="{Binding MuteButtonText}" MinWidth="94"
+                                                    IsEnabled="{Binding CanMute}" Click="AppMute_Click"/>
+                                            <TextBlock Text="{Binding MuteStatus}" Style="{StaticResource Muted}" TextAlignment="Center" Margin="0,2,0,0"/>
+                                        </StackPanel>
                                     </Grid>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                        <TextBlock x:Name="NoApps" Style="{StaticResource Muted}" Text="Nenhum programa tocando som agora." Visibility="Collapsed"/>
+                        <TextBlock x:Name="NoApps" Style="{StaticResource Muted}" Text="Nenhuma sessão de áudio encontrada." Visibility="Collapsed"/>
+                        <TextBlock x:Name="AppStatus" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,0" Visibility="Collapsed"/>
                     </StackPanel>
                 </Border>
 

@@ -21,9 +21,12 @@ public static class ProcessRunner
     }
 
     /// <summary>Roda um script que produz objetos e devolve-os desserializados como lista.</summary>
-    public static async Task<List<T>> PowerShellJsonAsync<T>(string script)
+    public static async Task<List<T>> PowerShellJsonAsync<T>(string script, bool failOnError = false)
     {
-        var (_, output, _) = await PowerShellAsync($"ConvertTo-Json -Compress -Depth 4 -InputObject @({script})").ConfigureAwait(false);
+        var errorPolicy = failOnError ? "$ErrorActionPreference='Stop'; " : "";
+        var (code, output, error) = await PowerShellAsync($"{errorPolicy}ConvertTo-Json -Compress -Depth 4 -InputObject @({script})").ConfigureAwait(false);
+        if (failOnError && code != 0)
+            throw new InvalidOperationException($"PowerShell retornou {code}. {error.Trim()}");
         output = output.Trim();
         if (output.Length == 0) return new();
         return JsonSerializer.Deserialize<List<T>>(output, JsonOptions) ?? new();

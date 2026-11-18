@@ -341,10 +341,10 @@ public static class NetworkService
     /// <summary>
     /// Pistas de coisas estranhas na rede. Não é antivírus: são sinais para você conferir.
     /// </summary>
-    public static List<NetAlert> Analyze(List<TcpConnection> connections, IReadOnlyCollection<AppTraffic> traffic)
+    internal static List<NetAlert> Analyze(List<TcpConnection> connections, IReadOnlyCollection<AppTraffic> traffic,
+        HashSet<string> running)
     {
         var alerts = new List<NetAlert>();
-        var running = Process.GetProcesses().Select(p => { using (p) return p.ProcessName; }).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         foreach (var (proc, name) in RemoteAccessApps.Where(r => running.Contains(r.Process)).DistinctBy(r => r.Name))
         {
@@ -355,29 +355,16 @@ public static class NetworkService
                     : $"{name} está rodando. Se você não usa, desinstale.", proc));
         }
 
-        foreach (var c in connections.Where(c => !c.Listening && SuspiciousPorts.Contains(c.RemotePort)))
-            alerts.Add(new NetAlert("Alta", $"Conexão em porta suspeita ({c.RemotePort})",
-                $"{c.Process} está conectado a {c.Remote}. Essa porta é muito usada por programas de invasão (RAT).", c.Process));
+        foreach (var c in connections.Where(c => c.State == "Conectada" && SuspiciousPorts.Contains(c.RemotePort))
+                     .DistinctBy(c => (c.Pid, c.RemoteIp, c.RemotePort)))
+            alerts.Add(new NetAlert("Baixa", $"Conexão em porta para revisar ({c.RemotePort})",
+                $"{c.Process} está conectado a {c.Remote}. A porta também é usada por programas legítimos.", c.Process));
 
         foreach (var c in connections.Where(c => c.Listening && !SystemListeners.Contains(c.Process)
                                                   && (c.Local.StartsWith("0.0.0.0") || c.Local.StartsWith("[::]")))
                                      .DistinctBy(c => (c.Process, c.LocalPort)))
             alerts.Add(new NetAlert("Baixa", $"Porta aberta: {c.LocalPort}",
                 $"{c.Process} aceita conexões de outros computadores na porta {c.LocalPort}. Normal para jogos, Steam e servidores; estranho se você não reconhece o programa.", c.Process));
-
-        // Programas sem fabricante, rodando de pastas temporárias, usando a internet.
-        var temp = Path.GetTempPath();
-        var downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
-        foreach (var pid in connections.Where(c => !c.Listening && c.State == "Conectada").Select(c => c.Pid).Distinct())
-        {
-            string? path = null;
-            try { using var p = Process.GetProcessById(pid); path = p.MainModule?.FileName; } catch { }
-            if (path == null) continue;
-            var inTemp = path.StartsWith(temp, StringComparison.OrdinalIgnoreCase) || path.StartsWith(downloads, StringComparison.OrdinalIgnoreCase);
-            if (inTemp && CommandLine.Publisher(path).Length == 0)
-                alerts.Add(new NetAlert("Alta", "Programa desconhecido usando a internet",
-                    $"{path} não tem fabricante e roda de uma pasta temporária/Downloads. Verifique com o antivírus.", Path.GetFileNameWithoutExtension(path)));
-        }
 
         foreach (var t in traffic.Where(t => t.Sent > 200L << 20 && t.Sent > t.Received * 2))
             alerts.Add(new NetAlert("Média", $"Enviando muitos dados: {t.Name}",
