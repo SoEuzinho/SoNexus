@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Windows;
 using SoNexus.Services;
 
@@ -9,6 +10,7 @@ public partial class App : Application
     private const string InstanceName = @"Local\SoNexus.SoStudio";
     private Mutex? _instance;
     private EventWaitHandle? _showSignal;
+    private string? _restartPath;
 
     /// <summary>"Fechar completamente": encerra mesmo com a opção de segundo plano ligada.</summary>
     public static bool Exiting { get; private set; }
@@ -37,11 +39,13 @@ public partial class App : Application
 
         // SONEXUS_INSTANCE: só para testes automáticos (rodar uma segunda cópia separada).
         var name = InstanceName + Environment.GetEnvironmentVariable("SONEXUS_INSTANCE");
-        bool first;
+        bool first = false;
         try
         {
-            _instance = new Mutex(true, name, out first);
+            _instance = new Mutex(false, name);
             _showSignal = new EventWaitHandle(false, EventResetMode.AutoReset, name + ".Show");
+            try { first = _instance.WaitOne(0); }
+            catch (AbandonedMutexException) { first = true; }
         }
         catch (UnauthorizedAccessException)
         {
@@ -51,6 +55,9 @@ public partial class App : Application
         if (!first || _showSignal == null)
         {
             try { _showSignal?.Set(); } catch { }
+            _instance?.Dispose();
+            _instance = null;
+            _showSignal?.Dispose();
             Exiting = true;
             Shutdown();
             return;
@@ -115,18 +122,17 @@ public partial class App : Application
         if (AppSettings.Current.GameBoost && SensorDriver.IsAdmin) GameBoostService.Instance.Start();
     }
 
-    /// <summary>Libera a "trava" de cópia única (para reabrir o app, ex.: depois de instalar o driver de sensores).</summary>
-    public void ReleaseInstance()
+    public void Restart()
     {
-        try { _instance?.ReleaseMutex(); } catch { }
-        _instance?.Dispose();
-        _instance = null;
+        _restartPath = Environment.ProcessPath;
+        ExitCompletely();
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
         if (MainWindow is MainWindow main)
         {
+            main.StopFpsMonitoring();
             FanControlService.Instance.RestoreAll();
             GameBoostService.Instance.Stop(); // devolve as prioridades originais
             HardwareService.Instance.Dispose();
@@ -134,5 +140,15 @@ public partial class App : Application
             main.DisposeTray();
         }
         base.OnExit(e);
+        if (_instance != null)
+        {
+            _instance.ReleaseMutex();
+            _instance.Dispose();
+        }
+        if (_restartPath is { } exe)
+        {
+            try { Process.Start(new ProcessStartInfo(exe) { UseShellExecute = true })?.Dispose(); }
+            catch (Exception ex) { AppLog.Write($"Não foi possível reabrir o SoNexus: {ex.Message}"); }
+        }
     }
 }

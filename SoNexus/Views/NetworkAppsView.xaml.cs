@@ -12,7 +12,9 @@ public partial class NetworkAppsView : UserControl
 {
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly ObservableCollection<AppTraffic> _apps = new();
+    private readonly Dictionary<int, AppTraffic> _appsByPid = new();
     private int _tick;
+    private bool _refreshing;
 
     public NetworkAppsView()
     {
@@ -32,8 +34,8 @@ public partial class NetworkAppsView : UserControl
         else
             Status.Text = $"Medindo desde {NetworkMonitor.Instance.Since:HH:mm}. Os valores somam enquanto o SoNexus estiver aberto.";
         _tick = 0;
-        await TickAsync();
         _timer.Start();
+        await TickAsync();
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e) => _timer.Stop();
@@ -42,9 +44,32 @@ public partial class NetworkAppsView : UserControl
 
     private async Task TickAsync()
     {
+        if (_refreshing || !IsVisible || Window.GetWindow(this)?.WindowState == WindowState.Minimized) return;
+        _refreshing = true;
+        try
+        {
+            await RefreshAsync();
+        }
+        finally
+        {
+            _refreshing = false;
+        }
+    }
+
+    private async Task RefreshAsync()
+    {
         var connections = await Task.Run(NetworkService.Connections);
+        if (!IsVisible) return;
         foreach (var app in NetworkMonitor.Instance.Sample(connections))
-            if (!_apps.Contains(app)) _apps.Add(app);
+        {
+            if (_appsByPid.TryGetValue(app.Pid, out var previous))
+            {
+                if (ReferenceEquals(app, previous)) continue;
+                _apps.Remove(previous);
+            }
+            _appsByPid[app.Pid] = app;
+            _apps.Add(app);
+        }
 
         // A lista de conexões muda menos: atualiza a cada 3 s.
         if (_tick++ % 3 != 0) return;
@@ -53,7 +78,10 @@ public partial class NetworkAppsView : UserControl
             .Where(c => all || (!c.Listening && !c.RemoteIp.StartsWith("127.") && c.RemoteIp != "::1" && c.RemoteIp != "0.0.0.0"))
             .OrderBy(c => c.Process).ToList();
         foreach (var c in shown.Where(c => !c.Listening))
+        {
+            if (!IsVisible) return;
             c.Host = await NetworkService.HostNameAsync(c.RemoteIp);
-        ConnGrid.ItemsSource = shown;
+        }
+        if (IsVisible) ConnGrid.ItemsSource = shown;
     }
 }

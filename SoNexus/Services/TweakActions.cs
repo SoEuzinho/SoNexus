@@ -148,63 +148,79 @@ internal static class TweakBackup
 
     // Pasta protegida (só administradores gravam): estes valores voltam para o registro do sistema ao "Reverter".
     private static string FilePath => SecureStore.File_("tweak-backup.json");
+    private static readonly object Sync = new();
     private static Dictionary<string, Entry>? _entries;
 
     public static string KeyFolder => SecureStore.Folder("registry-backup");
 
     private static Dictionary<string, Entry> Entries()
     {
-        if (_entries != null) return _entries;
-        try { _entries = File.Exists(FilePath) ? JsonSerializer.Deserialize<Dictionary<string, Entry>>(File.ReadAllText(FilePath)) : null; }
-        catch { }
-        return _entries ??= new();
+        return _entries ??= File.Exists(FilePath)
+            ? JsonSerializer.Deserialize<Dictionary<string, Entry>>(File.ReadAllText(FilePath))
+                ?? throw new InvalidDataException("O arquivo de backup dos ajustes está inválido.")
+            : new();
     }
 
-    private static void Save()
+    private static void Commit(Dictionary<string, Entry> entries)
     {
-        File.WriteAllText(FilePath, JsonSerializer.Serialize(Entries()));
+        var path = FilePath;
+        var temporary = $"{path}.{Guid.NewGuid():N}.tmp";
+        try
+        {
+            File.WriteAllText(temporary, JsonSerializer.Serialize(entries));
+            File.Move(temporary, path, overwrite: true);
+            _entries = entries;
+        }
+        finally
+        {
+            try { File.Delete(temporary); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        }
     }
 
     /// <summary>Registra o valor atual, só na primeira vez (assim aplicar duas vezes não perde o original).</summary>
     public static void Remember(string id, object? current, RegistryValueKind kind)
     {
-        lock (Entries())
+        lock (Sync)
         {
             if (Entries().ContainsKey(id)) return;
-            Entries()[id] = current switch
+            var next = new Dictionary<string, Entry>(Entries());
+            next[id] = current switch
             {
                 null => new Entry { Existed = false },
                 byte[] b => new Entry { Existed = true, Kind = "Binary", Data = Convert.ToBase64String(b) },
                 int i => new Entry { Existed = true, Kind = "DWord", Data = i.ToString() },
+                long l => new Entry { Existed = true, Kind = "QWord", Data = l.ToString() },
+                string[] items => new Entry { Existed = true, Kind = "MultiString", Data = JsonSerializer.Serialize(items) },
                 _ => new Entry { Existed = true, Kind = kind == RegistryValueKind.ExpandString ? "ExpandString" : "String", Data = current.ToString() ?? "" },
             };
-            Save();
+            Commit(next);
         }
     }
 
-    /// <summary>Devolve o original (e esquece). Retorna false se não havia backup.</summary>
     public static bool Contains(string id)
     {
-        lock (Entries()) return Entries().ContainsKey(id);
+        lock (Sync) return Entries().ContainsKey(id);
     }
 
-    public static bool TryTake(string id, out bool existed, out object? value, out RegistryValueKind kind)
+    /// <summary>Só descarta o backup depois que a restauração termina sem erro.</summary>
+    public static bool TryRestore(string id, Action<bool, object?, RegistryValueKind> restore)
     {
-        lock (Entries())
+        lock (Sync)
         {
-            existed = false;
-            value = null;
-            kind = RegistryValueKind.String;
-            if (!Entries().Remove(id, out var e)) return false;
-            Save();
-            existed = e.Existed;
-            (value, kind) = e.Kind switch
+            if (!Entries().TryGetValue(id, out var e)) return false;
+            (object? value, RegistryValueKind kind) = e.Kind switch
             {
                 "Binary" => ((object?)Convert.FromBase64String(e.Data), RegistryValueKind.Binary),
                 "DWord" => (int.Parse(e.Data), RegistryValueKind.DWord),
+                "QWord" => (long.Parse(e.Data), RegistryValueKind.QWord),
+                "MultiString" => (JsonSerializer.Deserialize<string[]>(e.Data), RegistryValueKind.MultiString),
                 "ExpandString" => (e.Data, RegistryValueKind.ExpandString),
                 _ => (e.Data, RegistryValueKind.String),
             };
+            restore(e.Existed, value, kind);
+            var next = new Dictionary<string, Entry>(Entries());
+            next.Remove(id);
+            Commit(next);
             return true;
         }
     }
@@ -265,12 +281,11 @@ public sealed class RegValue(RegistryHive hive, string path, string name, object
 
     public override void Revert()
     {
-        if (TweakBackup.TryTake(Id, out var existed, out var original, out var kind))
-        {
-            if (existed && original != null) Write(original, kind);
-            else Delete();
-            return;
-        }
+        if (TweakBackup.TryRestore(Id, (existed, original, kind) =>
+            {
+                if (existed && original != null) Write(original, kind);
+                else Delete();
+            })) return;
         if (defaultValue is null) Delete();
         else Write(defaultValue, KindOf(defaultValue));
     }

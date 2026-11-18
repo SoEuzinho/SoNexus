@@ -17,6 +17,11 @@ public partial class FpsView : UserControl
     private bool _updatingList;
     private GameSession? _session;
     private bool _building;
+    private readonly OverlayProfiles _profiles = new();
+    private string? _overlayGamePath;
+    private string? _overlayGameName;
+    private bool _editingProfile;
+    private OverlayProfile _overlayStyle = DefaultOverlayStyle();
     // Texto da prévia: o mesmo tipo de painel do jogo, montado pelo tema escolhido.
     private readonly TextBlock PreviewText = OverlayWindow.NewText();
     private int _refreshHz;
@@ -45,6 +50,8 @@ public partial class FpsView : UserControl
         }
         catch (Exception ex)
         {
+            _monitor?.Dispose();
+            _monitor = null;
             MessageBox.Show($"Não foi possível iniciar a medição: {ex.Message}", "SoNexus");
             return;
         }
@@ -60,20 +67,35 @@ public partial class FpsView : UserControl
 
     private void Stop_Click(object sender, RoutedEventArgs e)
     {
-        EndSession();
-        if (!IsVisible) _timer.Stop();
-        _monitor?.Dispose();
-        _monitor = null;
+        StopMonitoring();
+        SetOverlayGame(null);
+        if (IsVisible) _timer.Start();
         StartButton.Visibility = Visibility.Visible;
         StopButton.Visibility = Visibility.Collapsed;
         ResetButton.IsEnabled = false;
-        CloseOverlay();
+        CopyButton.IsEnabled = false;
         OverlayBox.IsChecked = false;
+    }
+
+    internal void StopMonitoring()
+    {
+        _timer.Stop();
+        EndSession();
+        _monitor?.Dispose();
+        _monitor = null;
+        _pinnedPid = _currentPid = null;
+        AutoProcessButton.Visibility = Visibility.Collapsed;
+        CloseOverlay();
     }
 
     private void Reset_Click(object sender, RoutedEventArgs e)
     {
-        if (_monitor != null && _currentPid is { } pid) _monitor.ResetSession(pid);
+        if (_monitor != null && _currentPid is { } pid && _session is { } session)
+        {
+            _monitor.ResetSession(pid);
+            _session = new GameSession(session.Game);
+        }
+        ClearStats();
         FpsChart.Clear();
         FrameChart.Clear();
     }
@@ -82,8 +104,16 @@ public partial class FpsView : UserControl
     {
         if (_updatingList || ProcessList.SelectedItem is not FpsProcess p) return;
         _pinnedPid = p.Pid;
+        AutoProcessButton.Visibility = Visibility.Visible;
         FpsChart.Clear();
         FrameChart.Clear();
+    }
+
+    private void AutoProcess_Click(object sender, RoutedEventArgs e)
+    {
+        _pinnedPid = null;
+        AutoProcessButton.Visibility = Visibility.Collapsed;
+        Refresh();
     }
 
     /// <summary>Atalho Ctrl+Shift+F: liga/desliga o painel sobre o jogo. Retorna se ficou ligado.</summary>
@@ -128,25 +158,28 @@ public partial class FpsView : UserControl
 
         _updatingList = true;
         ProcessList.ItemsSource = active;
-        _updatingList = false;
         NoProcess.Visibility = active.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
 
-        var game = _pinnedPid is { } pinned ? active.FirstOrDefault(p => p.Pid == pinned) : _monitor.PickGame(active);
+        var game = _pinnedPid is { } pinned ? active.FirstOrDefault(p => p.Pid == pinned) : _monitor.PickGame(active, _currentPid);
         if (game != null && game.Pid != _currentPid)
         {
             EndSession();
             _currentPid = game.Pid;
             _session = new GameSession(game.Name);
+            _monitor.ResetSession(game.Pid);
+            SetOverlayGame(game);
+            ClearStats();
             FpsChart.Clear();
             FrameChart.Clear();
         }
         ProcessList.SelectedItem = active.FirstOrDefault(p => p.Pid == _currentPid);
+        _updatingList = false;
 
         var s = Sample(game);
         CpuText.Text = $"CPU {Fmt(s.CpuLoad, "%")}  {Fmt(s.CpuTemp, "°C")}" + (s.CpuClock is { } cc ? $"  {cc / 1000:0.0} GHz" : "") + (s.CpuPower is { } cw ? $"  {cw:0} W" : "");
-        GpuText.Text = $"GPU {Fmt(s.GpuLoad, "%")}  {Fmt(s.GpuTemp, "°C")}  {Fmt(s.GpuPower, "W")}" +
+        GpuText.Text = $"GPU principal {Fmt(s.GpuLoad, "%")}  {Fmt(s.GpuTemp, "°C")}  {Fmt(s.GpuPower, "W")}" +
                        (s.VramUsedMb is { } vu ? (s.VramTotalMb is { } vt and > 0 ? $"  ·  VRAM {vu / 1024:0.0}/{vt / 1024:0} GB" : $"  ·  VRAM {vu / 1024:0.0} GB") : "");
-        RamText.Text = $"RAM {s.RamUsedGb:0.0}/{s.RamTotalGb:0} GB ({s.RamPct}%)" + (s.GameRamGb is { } gr ? $"  ·  jogo {gr:0.0} GB" : "");
+        RamText.Text = $"RAM {s.RamUsedGb:0.0}/{s.RamTotalGb:0} GB ({s.RamPct}%)" + (s.GameRamGb is { } gr ? $"  ·  processo {gr:0.0} GB" : "");
 
         if (game == null)
         {
@@ -183,11 +216,19 @@ public partial class FpsView : UserControl
         DiagnosisTitle.Text = title;
         DiagnosisText.Text = detail + (stats == null ? "" : $" Fluidez: {stats.Smoothness.ToLowerInvariant()} (1% low {stats.Low1:0} de média {stats.AvgFps:0}" +
                                                          (stats.Stutters > 0 ? $", {stats.Stutters} engasgo(s) na sessão" : "") + ").");
-        _session?.Add(second, limit);
+        _session?.Add(second, limit, stats?.Stutters);
         ShowSession();
         BottleneckText.Text = s.CoreMax > 0 ? $"núcleo mais ocupado: {s.CoreMax:0}%" : "";
 
         UpdateOverlay(s, (game, stats));
+    }
+
+    private void ClearStats()
+    {
+        CopyButton.IsEnabled = false;
+        AvgText.Text = Low1Text.Text = Low01Text.Text = "—";
+        DurationText.Text = "da sessão";
+        StutterText.Text = "";
     }
 
     /// <summary>Tudo o que os sensores e o Windows dizem agora. Cada valor é null quando este PC não tem o sensor.</summary>
@@ -232,81 +273,151 @@ public partial class FpsView : UserControl
         ("fps", "FPS"), ("low", "1% low"), ("frametime", "Tempo de quadro"), ("stutter", "Engasgos"),
         ("cpu", "Uso da CPU"), ("cputemp", "Temp. CPU"), ("cpuclock", "Clock CPU"), ("cpupower", "Consumo CPU"), ("core", "Maior núcleo"),
         ("gpu", "Uso da GPU"), ("gputemp", "Temp. GPU"), ("gpuclock", "Clock GPU"), ("gpupower", "Consumo GPU"), ("vram", "VRAM"),
-        ("ram", "RAM do PC"), ("gameram", "RAM do jogo"), ("time", "Hora"),
+        ("ram", "RAM do PC"), ("gameram", "RAM do processo"), ("time", "Hora"),
     };
 
     private void BuildOverlayOptions()
     {
-        _building = true;
-        var chosen = AppSettings.Current.OverlayItems.ToHashSet();
         foreach (var (key, label) in OverlayItems)
         {
-            var box = new CheckBox { Content = label, Tag = key, IsChecked = chosen.Contains(key), Margin = new Thickness(0, 0, 10, 6), MinWidth = 110 };
-            box.Click += (_, _) =>
-            {
-                AppSettings.Current.OverlayItems = OverlayItemsPanel.Children.OfType<CheckBox>()
-                    .Where(c => c.IsChecked == true).Select(c => (string)c.Tag).ToList();
-                AppSettings.Current.Save();
-            };
+            var box = new CheckBox { Content = label, Tag = key, Margin = new Thickness(0, 0, 10, 6), MinWidth = 110 };
+            box.Click += (_, _) => SaveOverlayOptions();
             OverlayItemsPanel.Children.Add(box);
         }
-        CornerBox.SelectedIndex = Math.Clamp(AppSettings.Current.OverlayCorner, 0, 3);
-        SizeBox.SelectedIndex = Math.Clamp(AppSettings.Current.OverlaySize, 0, 2);
-        ColorBox.SelectedIndex = Math.Clamp(AppSettings.Current.OverlayColor, 0, 3);
-        FlowBox.SelectedIndex = Math.Clamp(AppSettings.Current.OverlayFlow, 0, 1);
-        OpacitySlider.Value = Math.Clamp(AppSettings.Current.OverlayOpacity, 0, 100);
-        OpacityText.Text = $"{OpacitySlider.Value:0}%";
         ThemeBox.ItemsSource = OverlaySkin.Names;
-        ThemeBox.SelectedIndex = Math.Clamp(AppSettings.Current.OverlayTheme, 0, OverlaySkin.Names.Length - 1);
-        AnimateBox.IsChecked = AppSettings.Current.OverlayAnimate;
+        LoadOverlayOptions(_overlayStyle);
+        UpdateProfileStatus();
+    }
+
+    private static OverlayProfile DefaultOverlayStyle()
+    {
+        var settings = AppSettings.Current;
+        return new(settings.OverlayTheme, settings.OverlayCorner, settings.OverlaySize, settings.OverlayColor,
+            settings.OverlayFlow, settings.OverlayOpacity, settings.OverlayAnimate, settings.OverlayItems.ToArray());
+    }
+
+    private void LoadOverlayOptions(OverlayProfile profile)
+    {
+        _building = true;
+        var chosen = profile.Items.ToHashSet();
+        foreach (var box in OverlayItemsPanel.Children.OfType<CheckBox>())
+            box.IsChecked = chosen.Contains((string)box.Tag);
+        ThemeBox.SelectedIndex = Math.Clamp(profile.Theme, 0, OverlaySkin.Names.Length - 1);
+        CornerBox.SelectedIndex = Math.Clamp(profile.Corner, 0, 3);
+        SizeBox.SelectedIndex = Math.Clamp(profile.Size, 0, 2);
+        ColorBox.SelectedIndex = Math.Clamp(profile.Color, 0, 3);
+        FlowBox.SelectedIndex = Math.Clamp(profile.Flow, 0, 1);
+        OpacitySlider.Value = Math.Clamp(profile.Opacity, 0, 100);
+        AnimateBox.IsChecked = profile.Animate;
         _building = false;
+        _overlayStyle = ReadOverlayOptions();
+        OpacityText.Text = $"{_overlayStyle.Opacity}%";
         ApplyOverlayLook();
     }
 
-    private void OverlayLayout_Changed(object sender, SelectionChangedEventArgs e)
+    private OverlayProfile ReadOverlayOptions() =>
+        new(ThemeBox.SelectedIndex, CornerBox.SelectedIndex, SizeBox.SelectedIndex, ColorBox.SelectedIndex,
+            FlowBox.SelectedIndex, (int)OpacitySlider.Value, AnimateBox.IsChecked == true,
+            OverlayItemsPanel.Children.OfType<CheckBox>().Where(c => c.IsChecked == true).Select(c => (string)c.Tag).ToArray());
+
+    private void SaveOverlayOptions()
     {
         if (_building || CornerBox.SelectedIndex < 0 || SizeBox.SelectedIndex < 0 || ColorBox.SelectedIndex < 0 ||
             FlowBox.SelectedIndex < 0 || ThemeBox.SelectedIndex < 0) return;
-        var set = AppSettings.Current;
-        set.OverlayTheme = ThemeBox.SelectedIndex;
-        set.OverlayCorner = CornerBox.SelectedIndex;
-        set.OverlaySize = SizeBox.SelectedIndex;
-        set.OverlayColor = ColorBox.SelectedIndex;
-        set.OverlayFlow = FlowBox.SelectedIndex;
-        set.Save();
+
+        _overlayStyle = ReadOverlayOptions();
+        OpacityText.Text = $"{_overlayStyle.Opacity}%";
+        if (_editingProfile && _overlayGamePath is { } path)
+        {
+            try
+            {
+                _profiles.Set(path, _overlayStyle);
+                UpdateProfileStatus();
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write($"Não foi possível gravar o perfil do painel: {ex.Message}");
+                OverlayProfileStatus.Text = "As alterações do perfil ainda não foram gravadas.";
+            }
+        }
+        else
+        {
+            var set = AppSettings.Current;
+            set.OverlayTheme = _overlayStyle.Theme;
+            set.OverlayCorner = _overlayStyle.Corner;
+            set.OverlaySize = _overlayStyle.Size;
+            set.OverlayColor = _overlayStyle.Color;
+            set.OverlayFlow = _overlayStyle.Flow;
+            set.OverlayOpacity = _overlayStyle.Opacity;
+            set.OverlayAnimate = _overlayStyle.Animate;
+            set.OverlayItems = _overlayStyle.Items.ToList();
+            set.Save();
+        }
         ApplyOverlayLook();
-        UpdateOverlay(Sample(null), null);
     }
 
-    private void Opacity_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    private void OverlayLayout_Changed(object sender, SelectionChangedEventArgs e) => SaveOverlayOptions();
+    private void Opacity_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) => SaveOverlayOptions();
+    private void Animate_Click(object sender, RoutedEventArgs e) => SaveOverlayOptions();
+
+    private void SetOverlayGame(FpsProcess? game)
     {
-        if (_building) return;
-        AppSettings.Current.OverlayOpacity = (int)OpacitySlider.Value;
-        OpacityText.Text = $"{OpacitySlider.Value:0}%";
-        AppSettings.Current.Save();
-        ApplyOverlayLook();
+        _overlayGamePath = null;
+        _overlayGameName = game?.Name;
+        if (game != null)
+        {
+            try
+            {
+                using var process = System.Diagnostics.Process.GetProcessById(game.Pid);
+                _overlayGamePath = process.MainModule?.FileName;
+            }
+            catch { } // o processo pode ter fechado ou o Windows pode restringir o acesso
+        }
+        var profile = _profiles.ForExecutable(_overlayGamePath);
+        _editingProfile = profile != null;
+        LoadOverlayOptions(profile ?? DefaultOverlayStyle());
+        UpdateProfileStatus();
+    }
+
+    private void UpdateProfileStatus()
+    {
+        OverlayProfileStatus.Text = _editingProfile ? $"Perfil de {_overlayGameName}" : "Configuração padrão do painel";
+        OverlayProfileButton.Visibility = _overlayGamePath == null ? Visibility.Collapsed : Visibility.Visible;
+        OverlayProfileButton.Content = _editingProfile ? "Remover perfil deste jogo" : "Criar perfil para este jogo";
+    }
+
+    private void OverlayProfile_Click(object sender, RoutedEventArgs e)
+    {
+        if (_overlayGamePath is not { } path) return;
+        if (_editingProfile && MessageBox.Show($"Remover o perfil de {_overlayGameName} e usar a configuração padrão?",
+                "SoNexus", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+        if (!string.Equals(path, _overlayGamePath, StringComparison.OrdinalIgnoreCase)) return;
+        try
+        {
+            _profiles.Set(path, _editingProfile ? null : _overlayStyle);
+            _editingProfile = !_editingProfile;
+            if (!_editingProfile) LoadOverlayOptions(DefaultOverlayStyle());
+            UpdateProfileStatus();
+        }
+        catch (Exception ex)
+        {
+            OverlayProfileStatus.Text = $"Não foi possível gravar o perfil: {ex.Message}";
+        }
     }
 
     /// <summary>Aplica tamanho, fundo, canto e formato no painel do jogo e na prévia.</summary>
     private void ApplyOverlayLook()
     {
-        var set = AppSettings.Current;
+        var set = _overlayStyle;
         // Animação só na prévia visível e no painel do jogo; esconder a página para a da prévia.
-        PreviewHost.Content = OverlaySkin.Build(set.OverlayTheme, PreviewText, set.OverlaySize, set.OverlayOpacity, set.OverlayAnimate && IsVisible);
-        _overlay?.SetLayout(set.OverlayCorner, set.OverlaySize, set.OverlayOpacity, set.OverlayFlow == 1, set.OverlayTheme, set.OverlayAnimate);
+        PreviewHost.Content = OverlaySkin.Build(set.Theme, PreviewText, set.Size, set.Opacity, set.Animate && IsVisible);
+        _overlay?.SetLayout(set.Corner, set.Size, set.Opacity, set.Flow == 1, set.Theme, set.Animate);
         UpdateOverlay(Sample(null), null);
-    }
-
-    private void Animate_Click(object sender, RoutedEventArgs e)
-    {
-        AppSettings.Current.OverlayAnimate = AnimateBox.IsChecked == true;
-        AppSettings.Current.Save();
-        ApplyOverlayLook();
     }
 
     private void AntiCheat_Click(object sender, RoutedEventArgs e) => MessageBox.Show(
         "Como o SoNexus mede o FPS\n\n" +
-        "• Lê os eventos de desempenho que o próprio Windows publica para qualquer programa (ETW), o mesmo método do PresentMon e do CapFrameX.\n" +
+        "• Estima o FPS contando eventos de apresentação que o Windows publica por ETW. A contagem pode divergir dos quadros que chegam à tela.\n" +
         "• Não abre, não lê e não altera a memória do jogo, não injeta DLL e não mexe nos arquivos do jogo.\n" +
         "• O painel sobre o jogo é uma janela separada e transparente do Windows, como a do Discord: não desenha dentro do jogo.\n\n" +
         "Por isso ele não funciona como um cheat e não dá vantagem a ninguém.\n\n" +
@@ -322,7 +433,7 @@ public partial class FpsView : UserControl
         var stats = _monitor != null && _currentPid is { } pid ? _monitor.SessionStats(pid) : null;
         var session = _session;
         _session = null;
-        Task.Run(() => SessionHistory.Save(session, stats));
+        SessionHistory.Save(session, stats);
     }
 
     private List<HealthTip>? _ramTips;
@@ -394,8 +505,8 @@ public partial class FpsView : UserControl
     private void UpdateOverlay(Snapshot s, (FpsProcess Game, FpsStats? Stats)? play)
     {
         if (_overlay == null && !IsVisible) return;
-        var on = AppSettings.Current.OverlayItems.ToHashSet();
-        var value = OverlaySkin.ValueBrush(AppSettings.Current.OverlayTheme, AppSettings.Current.OverlayColor);
+        var on = _overlayStyle.Items.ToHashSet();
+        var value = OverlaySkin.ValueBrush(_overlayStyle.Theme, _overlayStyle.Color);
         var accent = value;
         var lines = new List<(string, string, Brush)>();
         static string Join(IEnumerable<string?> parts) => string.Join("  ", parts.Where(p => !string.IsNullOrEmpty(p)));
@@ -441,7 +552,7 @@ public partial class FpsView : UserControl
 
         if (lines.Count == 0) lines.Add(("", "Nada marcado em \"Mostrar sobre o jogo\"", Brushes.Gray));
         _overlay?.SetLines(lines);
-        OverlayWindow.Render(PreviewText, lines, AppSettings.Current.OverlayFlow == 1);
+        OverlayWindow.Render(PreviewText, lines, _overlayStyle.Flow == 1);
     }
 
     /// <summary>Quente demais fica vermelho (perigo de verdade); o resto na cor escolhida.</summary>

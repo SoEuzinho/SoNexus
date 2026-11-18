@@ -25,21 +25,20 @@ public sealed record FpsProcess(int Pid, string Name, double Fps, double FrameTi
 }
 
 /// <summary>
-/// Mede o FPS de qualquer jogo sem injetar nada nele, no estilo do PresentMon:
-/// escuta pelo ETW os eventos "Present" do DirectX (DXGI e D3D9) e calcula o tempo entre quadros.
-/// Jogos em Vulkan/OpenGL não passam pelo DXGI: para eles usamos o evento de "Present" do kernel de vídeo (DxgKrnl).
+/// Estima a cadência de apresentação por processo a partir de eventos ETW do DirectX ou do kernel gráfico.
 /// </summary>
 public sealed class FpsMonitor : IDisposable
 {
     private static readonly Guid Dxgi = new("CA11C036-0102-4A2D-A6AD-F03CFED5D3C9");
     private static readonly Guid D3D9 = new("783ACA0A-790E-4D7F-8451-AA850511C6B9");
     private static readonly Guid DxgKrnl = new("802EC45A-1E99-4B83-9920-87C98277BA9D");
-    private const int MaxSessionFrames = 1_000_000;
+    private const int FrameTimeBucketsPerMs = 10;
 
     private readonly object _lock = new();
     private readonly Dictionary<int, State> _processes = new();
     private readonly Dictionary<int, string> _names = new();
     private TraceEventSession? _session;
+    private SessionFrames? _frames;
 
     private sealed class State
     {
@@ -48,8 +47,62 @@ public sealed class FpsMonitor : IDisposable
         public bool HasDirectX;
         public string Api = "";
         public readonly Queue<(long Wall, double Ms)> Recent = new();
-        public readonly List<double> Session = new();
-        public long SessionStart = Stopwatch.GetTimestamp();
+    }
+
+    private sealed class SessionFrames(int pid)
+    {
+        public readonly int Pid = pid;
+        public readonly long Started = Stopwatch.GetTimestamp();
+        public readonly SortedDictionary<int, (int Count, double Total)> Histogram = new();
+        public int Count;
+        public double Total;
+        public double Worst;
+
+        public void Add(double milliseconds)
+        {
+            var bucket = (int)(milliseconds * FrameTimeBucketsPerMs);
+            var current = Histogram.GetValueOrDefault(bucket);
+            Histogram[bucket] = (current.Count + 1, current.Total + milliseconds);
+            Count++;
+            Total += milliseconds;
+            Worst = Math.Max(Worst, milliseconds);
+        }
+
+        public FpsStats? Stats()
+        {
+            if (Count < 10) return null;
+
+            var middle = Count / 2;
+            var median = 0d;
+            foreach (var (count, total) in Histogram.Values)
+            {
+                if (middle < count)
+                {
+                    median = total / count;
+                    break;
+                }
+                middle -= count;
+            }
+
+            double Low(double fraction)
+            {
+                var requested = Math.Max(1, (int)(Count * fraction));
+                var skip = Count - requested;
+                var slowest = 0d;
+                foreach (var (count, total) in Histogram.Values)
+                {
+                    var skipped = Math.Min(count, skip);
+                    skip -= skipped;
+                    slowest += total / count * (count - skipped);
+                }
+                return 1000 * requested / slowest;
+            }
+
+            // O tamanho dos grupos é de 0,1 ms, mantendo o custo estável em sessões longas.
+            var stutters = Histogram.Values.Where(b => b.Total / b.Count > Math.Max(20, median * 2.5)).Sum(b => b.Count);
+            return new FpsStats(1000 * Count / Total, Low(0.01), Low(0.001), Worst, Count,
+                Stopwatch.GetElapsedTime(Started), stutters, median);
+        }
     }
 
     public void Start()
@@ -71,9 +124,9 @@ public sealed class FpsMonitor : IDisposable
         // DXGI: 42 = Present_Start, 55 = PresentMultiplaneOverlay_Start. D3D9: 1 = Present_Start.
         // DxgKrnl: 184 = Present_Info (chamado por OpenGL/Vulkan e pelo DirectX também).
         string api;
-        if (e.ProviderGuid == Dxgi && id is 42 or 55) api = "DirectX 10/11/12";
-        else if (e.ProviderGuid == D3D9 && id == 1) api = "DirectX 9";
-        else if (e.ProviderGuid == DxgKrnl && id == 184) api = "Vulkan/OpenGL";
+        if (e.ProviderGuid == Dxgi && id is 42 or 55) api = "DXGI";
+        else if (e.ProviderGuid == D3D9 && id == 1) api = "Direct3D 9";
+        else if (e.ProviderGuid == DxgKrnl && id == 184) api = "Kernel gráfico";
         else return;
 
         var t = e.TimeStampRelativeMSec;
@@ -81,7 +134,7 @@ public sealed class FpsMonitor : IDisposable
         lock (_lock)
         {
             if (!_processes.TryGetValue(e.ProcessID, out var s)) _processes[e.ProcessID] = s = new State();
-            if (api == "Vulkan/OpenGL")
+            if (e.ProviderGuid == DxgKrnl)
             {
                 if (s.HasDirectX) return;
             }
@@ -91,7 +144,8 @@ public sealed class FpsMonitor : IDisposable
                 s.HasDirectX = true;
                 s.LastMs = -1;
                 s.Recent.Clear();
-                s.Session.Clear();
+                if (_frames?.Pid == e.ProcessID)
+                    _frames = new SessionFrames(e.ProcessID);
             }
             s.Api = api;
             if (s.LastMs >= 0)
@@ -100,7 +154,7 @@ public sealed class FpsMonitor : IDisposable
                 if (dt is > 0 and < 2000)
                 {
                     s.Recent.Enqueue((wall, dt));
-                    if (s.Session.Count < MaxSessionFrames) s.Session.Add(dt);
+                    if (_frames?.Pid == e.ProcessID) _frames.Add(dt);
                 }
             }
             s.LastMs = t;
@@ -133,38 +187,26 @@ public sealed class FpsMonitor : IDisposable
 
     public FpsStats? SessionStats(int pid)
     {
-        List<double> frames;
-        long start;
         lock (_lock)
-        {
-            if (!_processes.TryGetValue(pid, out var s) || s.Session.Count < 10) return null;
-            frames = s.Session.ToList();
-            start = s.SessionStart;
-        }
-        var sorted = frames.OrderByDescending(f => f).ToList();
-        double Low(double fraction) => 1000 / sorted.Take(Math.Max(1, (int)(sorted.Count * fraction))).Average();
-        var median = sorted[sorted.Count / 2];
-        var stutters = frames.Count(f => f > median * 2.5 && f > 20);
-        return new FpsStats(1000 / frames.Average(), Low(0.01), Low(0.001), sorted[0], frames.Count,
-            Stopwatch.GetElapsedTime(start), stutters, median);
+            return _frames?.Pid == pid ? _frames.Stats() : null;
     }
 
     public void ResetSession(int pid)
     {
         lock (_lock)
         {
-            if (!_processes.TryGetValue(pid, out var s)) return;
-            s.Session.Clear();
-            s.SessionStart = Stopwatch.GetTimestamp();
+            if (_processes.TryGetValue(pid, out var s)) s.LastMs = -1;
+            _frames = new SessionFrames(pid);
         }
     }
 
-    /// <summary>Escolhe o jogo: a janela em primeiro plano, se estiver desenhando; senão o maior FPS.</summary>
-    public FpsProcess? PickGame(List<FpsProcess> active)
+    /// <summary>Seleciona o processo ativo em primeiro plano ou mantém a medição ao focalizar o SoNexus.</summary>
+    public FpsProcess? PickGame(List<FpsProcess> active, int? currentPid)
     {
         var candidates = active.Where(p => !Ignored(p.Name)).ToList();
         GetWindowThreadProcessId(GetForegroundWindow(), out var fg);
-        return candidates.FirstOrDefault(p => p.Pid == fg) ?? candidates.FirstOrDefault();
+        return fg == Environment.ProcessId ? candidates.FirstOrDefault(p => p.Pid == currentPid)
+            : candidates.FirstOrDefault(p => p.Pid == fg);
     }
 
     private static bool Ignored(string name) =>

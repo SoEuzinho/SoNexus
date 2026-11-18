@@ -9,7 +9,6 @@ public partial class NetworkRoutesView : UserControl
     private const int Rounds = 30; // ~20 s de medição
     private readonly List<(string Name, string Host, int Port)> _targets = new();
     private CancellationTokenSource? _cts;
-    private List<RouteHop> _hops = new();
     private bool _loaded;
 
     public NetworkRoutesView() => InitializeComponent();
@@ -53,8 +52,10 @@ public partial class NetworkRoutesView : UserControl
     private async void Trace_Click(object sender, RoutedEventArgs e)
     {
         var (host, port) = CurrentTarget();
-        if (host.Length == 0) return;
-        _cts = new CancellationTokenSource();
+        if (host.Length == 0 || _cts != null) return;
+        using var cancellation = new CancellationTokenSource();
+        _cts = cancellation;
+        List<RouteHop> hops = new();
         TraceButton.Visibility = Visibility.Collapsed;
         StopButton.Visibility = Visibility.Visible;
         VerdictCard.Visibility = Visibility.Visible;
@@ -63,13 +64,13 @@ public partial class NetworkRoutesView : UserControl
         HopList.ItemsSource = null;
         try
         {
-            await RouteService.TraceAsync(host, port, hops => Dispatcher.Invoke(() =>
+            await RouteService.TraceAsync(host, port, discovered => Dispatcher.Invoke(() =>
             {
-                _hops = hops;
+                hops = discovered;
                 HopList.ItemsSource = hops;
                 VerdictTitle.Text = $"{hops.Count} saltos até o destino. Medindo...";
-            }), Rounds, _cts.Token);
-            var (title, detail) = RouteService.Diagnose(_hops);
+            }), Rounds, cancellation.Token);
+            var (title, detail) = RouteService.Diagnose(hops);
             VerdictTitle.Text = title;
             VerdictText.Text = detail;
         }
@@ -80,15 +81,17 @@ public partial class NetworkRoutesView : UserControl
         }
         catch (OperationCanceledException)
         {
-            if (_hops.Count > 0)
-            {
-                var (title, detail) = RouteService.Diagnose(_hops);
-                VerdictTitle.Text = title;
-                VerdictText.Text = detail + " (medição interrompida)";
-            }
+            VerdictTitle.Text = "Medição interrompida";
+            VerdictText.Text = hops.Count == 0
+                ? "O caminho ainda estava sendo descoberto."
+                : "A tabela mostra o resultado parcial da medição.";
         }
-        TraceButton.Visibility = Visibility.Visible;
-        StopButton.Visibility = Visibility.Collapsed;
+        finally
+        {
+            _cts = null;
+            TraceButton.Visibility = Visibility.Visible;
+            StopButton.Visibility = Visibility.Collapsed;
+        }
     }
 
     private void Stop_Click(object sender, RoutedEventArgs e) => _cts?.Cancel();

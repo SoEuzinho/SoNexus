@@ -9,6 +9,9 @@ namespace SoNexus;
 public partial class MainWindow : Window
 {
     private readonly Dictionary<string, UserControl> _views = new();
+    private FpsView? _fpsView;
+
+    internal void StopFpsMonitoring() => _fpsView?.StopMonitoring();
 
     public MainWindow()
     {
@@ -90,14 +93,15 @@ public partial class MainWindow : Window
         Width = Math.Max(MinWidth, s.WindowWidth);
         Height = Math.Max(MinHeight, s.WindowHeight);
         // Só usa a posição salva se ainda estiver numa tela (monitor pode ter sido desligado).
-        if (!double.IsNaN(s.WindowLeft) && s.WindowLeft >= SystemParameters.VirtualScreenLeft - 50 &&
-            s.WindowLeft < SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth - 200 &&
-            s.WindowTop >= SystemParameters.VirtualScreenTop - 10 &&
-            s.WindowTop < SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight - 100)
+        if (s.WindowLeft is { } left && s.WindowTop is { } top &&
+            left >= SystemParameters.VirtualScreenLeft - 50 &&
+            left < SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth - 200 &&
+            top >= SystemParameters.VirtualScreenTop - 10 &&
+            top < SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight - 100)
         {
             WindowStartupLocation = WindowStartupLocation.Manual;
-            Left = s.WindowLeft;
-            Top = s.WindowTop;
+            Left = left;
+            Top = top;
         }
         if (s.WindowMaximized) WindowState = WindowState.Maximized;
     }
@@ -106,7 +110,7 @@ public partial class MainWindow : Window
     {
         var s = AppSettings.Current;
         var b = WindowState == WindowState.Normal ? new Rect(Left, Top, Width, Height) : RestoreBounds;
-        if (b.Width > 0)
+        if (b.Width > 0 && double.IsFinite(b.Left) && double.IsFinite(b.Top))
         {
             (s.WindowLeft, s.WindowTop, s.WindowWidth, s.WindowHeight) = (b.Left, b.Top, b.Width, b.Height);
             s.WindowMaximized = WindowState == WindowState.Maximized;
@@ -130,8 +134,6 @@ public partial class MainWindow : Window
             AppSettings.Current.TrayHintShown = true;
             AppSettings.Current.Save();
         }
-        // Na bandeja ninguém vê a tela: devolve ao Windows a memória das páginas abertas.
-        Dispatcher.BeginInvoke(MemoryTrim.Now, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
     }
 
     public void ShowFromTray()
@@ -241,7 +243,7 @@ public partial class MainWindow : Window
                 nameof(NavGames) => new SectionView(
                     ("Biblioteca", () => new GameLibraryView()),
                     ("Seu PC e gargalo", () => new GameAnalysisView()),
-                    ("FPS ao vivo", () => new FpsView()),
+                    ("FPS ao vivo", () => _fpsView ??= new FpsView()),
                     ("Realidade virtual", () => new VrView())),
                 // Tudo de medir e forçar o PC num lugar só (as mesmas telas aparecem também na peça, em Hardware).
                 nameof(NavPerf) => new SectionView(

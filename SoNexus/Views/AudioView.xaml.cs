@@ -26,18 +26,35 @@ public partial class AudioView : UserControl
         _meters.Start();
     }
 
-    private void OnUnloaded(object sender, RoutedEventArgs e) => _meters.Stop();
+    private void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        _meters.Stop();
+        DeviceList.ItemsSource = AppList.ItemsSource = null;
+        DisposeSnapshot(_devices, _apps);
+        _devices = new();
+        _apps = new();
+    }
 
     private void Reload_Click(object sender, RoutedEventArgs e) => Reload();
 
     private void SoundPanel_Click(object sender, RoutedEventArgs e) =>
         Process.Start(new ProcessStartInfo("mmsys.cpl") { UseShellExecute = true });
 
-    private void Reload()
+    private void Reload(bool force = true)
     {
         try
         {
-            (_devices, _apps) = AudioService.Load();
+            var (devices, apps) = AudioService.Load();
+            var sameDevices = devices.Select(DeviceKey).SequenceEqual(_devices.Select(DeviceKey));
+            var sameApps = apps.Select(a => (a.DeviceId, a.SessionId)).ToHashSet()
+                .SetEquals(_apps.Select(a => (a.DeviceId, a.SessionId)));
+            if (!force && sameDevices && sameApps)
+            {
+                DisposeSnapshot(devices, apps);
+                return;
+            }
+            DisposeSnapshot(_devices, _apps);
+            (_devices, _apps) = (devices, apps);
         }
         catch (Exception ex)
         {
@@ -65,24 +82,21 @@ public partial class AudioView : UserControl
         WarningCard.Visibility = warnings.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    private static (string Id, string Name, bool Default, string Format, string Latency) DeviceKey(AudioDevice device) =>
+        (device.Id, device.Name, device.IsDefault, device.Format, device.Latency);
+
+    private static void DisposeSnapshot(IEnumerable<AudioDevice> devices, IEnumerable<AudioApp> apps)
+    {
+        foreach (var app in apps) app.Dispose();
+        foreach (var device in devices) device.Dispose();
+    }
+
     private void Tick()
     {
+        if (!IsVisible || Window.GetWindow(this)?.WindowState == WindowState.Minimized) return;
         foreach (var d in _devices) d.Refresh();
         foreach (var a in _apps) a.Refresh();
         // Programas abrem e fecham: recarrega a lista a cada 5 s.
-        if (++_tick % 60 == 0)
-        {
-            try
-            {
-                var (_, apps) = AudioService.Load();
-                if (apps.Count != _apps.Count || apps.Select(a => a.Pid).Except(_apps.Select(a => a.Pid)).Any())
-                {
-                    _apps = apps;
-                    AppList.ItemsSource = _apps;
-                    NoApps.Visibility = _apps.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-                }
-            }
-            catch { }
-        }
+        if (++_tick % 60 == 0) Reload(force: false);
     }
 }

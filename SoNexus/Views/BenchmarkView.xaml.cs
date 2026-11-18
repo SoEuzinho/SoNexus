@@ -36,6 +36,11 @@ public partial class BenchmarkView : UserControl
 
     private async Task RunAsync(bool multi, bool single)
     {
+        if (!HardwareTest.Slot.Wait(0))
+        {
+            PhaseText.Text = "Aguarde o teste de hardware em andamento terminar.";
+            return;
+        }
         _cts = new CancellationTokenSource();
         StartBar.Visibility = Visibility.Collapsed;
         StopButton.Visibility = Visibility.Visible;
@@ -61,6 +66,9 @@ public partial class BenchmarkView : UserControl
         }
         finally
         {
+            _cts.Dispose();
+            _cts = null;
+            HardwareTest.Slot.Release();
             _timer.Stop();
             LiveText.Text = "";
             StartBar.Visibility = Visibility.Visible;

@@ -7,7 +7,7 @@
             <StackPanel Margin="0,0,560,0">
                 <TextBlock Text="Desempenho em jogos" Style="{StaticResource H1}"/>
                 <TextBlock Style="{StaticResource Muted}" FontSize="13" Margin="0,4,0,0" TextWrapping="Wrap"
-                           Text="Mede FPS, 1% low, engasgos e tempo de quadro de jogos DirectX 9/11/12, Vulkan e OpenGL, sem mexer no jogo. Inicie a medição e abra o jogo."/>
+                           Text="Estima FPS e tempos de quadro a partir dos eventos de apresentação do Windows. Inicie a medição e abra o jogo."/>
                 <TextBlock FontSize="13" Margin="0,4,0,0">
                     <Hyperlink Click="AntiCheat_Click" Foreground="{StaticResource TextBrush}">Isso pode dar ban? Veja como funciona</Hyperlink>
                 </TextBlock>
@@ -33,6 +33,9 @@
                 <TextBlock Text="Mostrar sobre o jogo" Style="{StaticResource H2}"/>
                 <TextBlock Style="{StaticResource Muted}" Margin="0,2,0,8" TextWrapping="Wrap"
                            Text="Aparece por cima do jogo em janela sem borda (Ctrl+Shift+F liga e desliga). Em tela cheia exclusiva o Windows não deixa."/>
+                <TextBlock x:Name="OverlayProfileStatus" Style="{StaticResource Muted}" Margin="0,0,0,6" TextWrapping="Wrap"/>
+                <Button x:Name="OverlayProfileButton" Visibility="Collapsed" Margin="0,0,0,10" HorizontalAlignment="Left"
+                        Click="OverlayProfile_Click"/>
                 <!-- Prévia: o mesmo painel, com os números de agora -->
                 <Border CornerRadius="6" Padding="4" Margin="0,0,0,10" MinHeight="70" ClipToBounds="True">
                     <Border.Background>
@@ -101,6 +104,8 @@
                 <TextBlock DockPanel.Dock="Top" Text="Programas com FPS" Style="{StaticResource H2}"/>
                 <TextBlock DockPanel.Dock="Top" Style="{StaticResource Muted}" Margin="0,2,0,10" TextWrapping="Wrap"
                            Text="O jogo em primeiro plano é escolhido sozinho. Clique para fixar outro."/>
+                <Button x:Name="AutoProcessButton" DockPanel.Dock="Top" Content="Voltar à seleção automática"
+                        HorizontalAlignment="Left" Visibility="Collapsed" Click="AutoProcess_Click"/>
                 <TextBlock x:Name="NoProcess" DockPanel.Dock="Top" Style="{StaticResource Muted}" FontStyle="Italic"
                            Text="Nenhum programa desenhando quadros ainda."/>
                 <ListBox x:Name="ProcessList" Background="Transparent" BorderThickness="0" SelectionChanged="Process_Selected">

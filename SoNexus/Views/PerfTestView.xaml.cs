@@ -22,8 +22,12 @@ public partial class PerfTestView : UserControl
 
     private async void Start_Click(object sender, RoutedEventArgs e)
     {
-        if (StressBusy()) return;
-        var r = HardwareService.Instance.Readings;
+        if (!HardwareTest.Slot.Wait(0))
+        {
+            MessageBox.Show("Aguarde o teste de hardware em andamento terminar.", "SoNexus");
+            return;
+        }
+        var r = HardwareService.Instance.FreshReadings;
         SensorWarn.Visibility = HardwareService.CpuNow(r).Temp == null ? Visibility.Visible : Visibility.Collapsed;
 
         _cts = new CancellationTokenSource();
@@ -52,18 +56,11 @@ public partial class PerfTestView : UserControl
             Bar.Value = _test?.Progress ?? 0;
             _cts.Dispose();
             _cts = null;
+            HardwareTest.Slot.Release();
             StartButton.Visibility = Visibility.Visible;
             CancelButton.Visibility = Visibility.Collapsed;
             LabelBox.IsEnabled = DiskBox.IsEnabled = true;
         }
-    }
-
-    /// <summary>Teste completo e stress test ao mesmo tempo dariam números errados (e calor demais).</summary>
-    private static bool StressBusy()
-    {
-        if (!SharedPages.Get<StressView>().IsRunning) return false;
-        MessageBox.Show("O stress test está rodando. Pare o stress test antes de medir.", "SoNexus");
-        return true;
     }
 
     private void Cancel_Click(object sender, RoutedEventArgs e) => _cts?.Cancel();

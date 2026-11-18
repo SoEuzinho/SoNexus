@@ -143,7 +143,7 @@ public sealed class GameBoostView : UserControl
             else GameBoostService.Instance.Stop();
             Refresh();
         };
-        balance.Click += (_, _) => { set.ProBalance = balance.IsChecked == true; set.Save(); };
+        balance.Click += (_, _) => { GameBoostService.Instance.SetProBalance(balance.IsChecked == true); set.Save(); Refresh(); };
         page.Children.Add(Ui.Card(Ui.Stack(on, balance,
             Ui.Muted("Jogo = programa instalado numa pasta de jogos (Steam, Epic, GOG, Xbox...) ou janela que cobre a tela inteira. " +
                      "Nunca mexe no Windows, em antivírus, em programas de voz (Discord) nem de stream (OBS). Funciona com o SoNexus aberto ou na bandeja.", 12))));

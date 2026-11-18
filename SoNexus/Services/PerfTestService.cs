@@ -109,15 +109,17 @@ public sealed class PerfTest
         catch { }
 
         // Vigia de temperatura durante todo o teste.
-        using var watch = new Timer(_ =>
+        string? monitoredGpu = null;
+        var watch = new Timer(_ =>
         {
-            var r = HardwareService.Instance.Readings;
+            var r = HardwareService.Instance.FreshReadings;
             var cpu = HardwareService.CpuNow(r).Temp;
-            var gpu = HardwareService.GpuNow(r).Temp;
+            var adapter = Volatile.Read(ref monitoredGpu);
+            var gpu = adapter == null ? null : HardwareService.TestGpuTemp(HardwareService.TestGpuReadings(r, adapter));
             if (cpu > (MaxCpuTemp ?? 0)) MaxCpuTemp = cpu;
             if (gpu > (MaxGpuTemp ?? 0)) MaxGpuTemp = gpu;
-            if (cpu >= CpuLimit) _hot = $"o processador chegou a {cpu:0} °C";
-            else if (gpu >= GpuLimit) _hot = $"a placa de vídeo chegou a {gpu:0} °C";
+            if (cpu == null) _hot = "sem leitura recente de temperatura do processador";
+            else if (cpu >= CpuLimit) _hot = $"o processador chegou a {cpu:0} °C";
             if (_hot != null) cts.Cancel();
         }, null, 0, 1000);
 
@@ -127,6 +129,10 @@ public sealed class PerfTest
 
         try
         {
+            var cpu = HardwareService.CpuNow(HardwareService.Instance.FreshReadings).Temp;
+            if (cpu == null || cpu >= CpuLimit)
+                throw new HardwareTestSafetyException(cpu == null ? "sem leitura recente de temperatura do processador"
+                    : $"o processador chegou a {cpu:0} °C");
             var threads = Environment.ProcessorCount;
             Next("Aquecendo o processador");
             await new BenchmarkRun().RunAsync(threads, TimeSpan.FromSeconds(5), ct);
@@ -155,26 +161,30 @@ public sealed class PerfTest
             {
                 using var gpu = await Task.Run(GpuTester.Create, ct);
                 run.Gpu = gpu.AdapterName;
-                await For(TimeSpan.FromSeconds(4), ct, c => gpu.RunCompute(c)); // aquece
+                Volatile.Write(ref monitoredGpu, gpu.AdapterName);
+                await For(TimeSpan.FromSeconds(4), ct, c => gpu.RunCompute(c, GpuLimit)); // aquece
                 var gflops = new List<double>();
                 for (var i = 1; i <= Rounds; i++)
                 {
                     Next($"Placa de vídeo, cálculo ({i}/{Rounds})");
-                    await For(TimeSpan.FromSeconds(5), ct, c => gpu.RunCompute(c));
+                    await For(TimeSpan.FromSeconds(5), ct, c => gpu.RunCompute(c, GpuLimit));
                     if (gpu.Rate > 0) gflops.Add(gpu.Rate);
                 }
                 if (gflops.Count > 0) run.GpuGflops = Measured.From(gflops);
 
                 Next("Memória da placa (VRAM)");
                 using var vram = await Task.Run(GpuTester.Create, ct);
-                await For(TimeSpan.FromSeconds(8), ct, c => vram.RunVram(c));
+                Volatile.Write(ref monitoredGpu, vram.AdapterName);
+                await For(TimeSpan.FromSeconds(8), ct, c => vram.RunVram(c, GpuLimit));
                 if (vram.Rate > 0) run.VramGBs = new Measured(vram.Rate, 0, 1);
             }
             catch (OperationCanceledException) { throw; }
+            catch (HardwareTestSafetyException) { throw; }
             catch (Exception ex)
             {
                 run.Gpu = $"não testada: {ex.Message}";
             }
+            finally { Volatile.Write(ref monitoredGpu, null); }
             ct.ThrowIfCancellationRequested();
 
             var read = new List<double>();
@@ -208,6 +218,14 @@ public sealed class PerfTest
         catch (OperationCanceledException)
         {
             run.StopReason = _hot != null ? $"Parado por segurança: {_hot}." : "Cancelado.";
+        }
+        catch (HardwareTestSafetyException ex)
+        {
+            run.StopReason = $"Parado por segurança: {ex.Message}.";
+        }
+        finally
+        {
+            await watch.DisposeAsync();
         }
         run.MaxCpuTemp = MaxCpuTemp;
         run.MaxGpuTemp = MaxGpuTemp;

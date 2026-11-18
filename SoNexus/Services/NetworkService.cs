@@ -291,12 +291,21 @@ public static class NetworkService
     [DllImport("iphlpapi.dll")]
     private static extern int GetExtendedTcpTable(IntPtr table, ref int size, bool order, int family, int tableClass, int reserved);
 
-    private static readonly Dictionary<string, string> HostCache = new();
+    private static readonly Dictionary<string, (string Name, long StoredAt)> HostCache = new();
 
     /// <summary>Nome do servidor de um IP (DNS reverso), com cache.</summary>
     public static async Task<string> HostNameAsync(string ip)
     {
-        lock (HostCache) if (HostCache.TryGetValue(ip, out var h)) return h;
+        if (!AppSettings.Current.AllowOnline) return "";
+        lock (HostCache)
+        {
+            if (HostCache.TryGetValue(ip, out var cached))
+            {
+                if (cached.Name.Length > 0 || Stopwatch.GetElapsedTime(cached.StoredAt) < TimeSpan.FromSeconds(30))
+                    return cached.Name;
+                HostCache.Remove(ip);
+            }
+        }
         string name;
         try
         {
@@ -306,7 +315,7 @@ public static class NetworkService
             name = await Task.WhenAny(task, Task.Delay(1500)) == task ? task.Result.HostName : "";
         }
         catch { name = ""; }
-        lock (HostCache) HostCache[ip] = name;
+        lock (HostCache) HostCache[ip] = (name, Stopwatch.GetTimestamp());
         return name;
     }
 
@@ -465,9 +474,11 @@ public sealed class NetworkMonitor
     private readonly object _lock = new();
     private readonly Dictionary<int, (long Sent, long Received)> _totals = new();
     private readonly Dictionary<int, (long Sent, long Received)> _previous = new();
-    private readonly Dictionary<int, AppTraffic> _apps = new();
+    private readonly Dictionary<int, TrafficProcess> _apps = new();
     private TraceEventSession? _session;
     private long _lastSample = Stopwatch.GetTimestamp();
+
+    private sealed record TrafficProcess(AppTraffic Traffic, DateTime? Started, (long Sent, long Received) Baseline);
 
     public bool Running { get; private set; }
     public string? Error { get; private set; }
@@ -525,27 +536,48 @@ public sealed class NetworkMonitor
         var byPid = connections.Where(c => !c.Listening).GroupBy(c => c.Pid).ToDictionary(g => g.Key, g => g.Count());
         foreach (var (pid, t) in totals)
         {
-            if (!_apps.TryGetValue(pid, out var app))
+            _apps.TryGetValue(pid, out var process);
+            _previous.TryGetValue(pid, out var prev);
+            if (process == null || prev != t)
             {
                 string name = $"PID {pid}";
                 string? path = null;
+                DateTime? started = null;
                 try
                 {
                     using var p = Process.GetProcessById(pid);
                     name = pid == 4 ? "System" : p.ProcessName;
-                    try { path = p.MainModule?.FileName; } catch { }
+                    try { started = p.StartTime.ToUniversalTime(); } catch { }
+                    if (process == null || process.Started != started || process.Traffic.Name != name)
+                    {
+                        try { path = p.MainModule?.FileName; } catch { }
+                    }
                 }
                 catch { }
-                _apps[pid] = app = new AppTraffic(pid, name, path);
+                var changed = process != null && (started != null && process.Started != null && started != process.Started ||
+                    name != $"PID {pid}" && process.Traffic.Name != $"PID {pid}" && name != process.Traffic.Name);
+                if (process == null || changed)
+                {
+                    // Os bytes anteriores pertencem a outra instância do PID.
+                    var baseline = changed ? t : default;
+                    process = new(new AppTraffic(pid, name, path), started, baseline);
+                    _apps[pid] = process;
+                    if (changed) prev = t;
+                }
+                else if (process.Started == null && started != null)
+                {
+                    process = process with { Traffic = new AppTraffic(pid, name, path), Started = started };
+                    _apps[pid] = process;
+                }
             }
-            _previous.TryGetValue(pid, out var prev);
+            var app = process.Traffic;
             app.DownRate = (t.Received - prev.Received) / seconds;
             app.UpRate = (t.Sent - prev.Sent) / seconds;
-            app.Sent = t.Sent;
-            app.Received = t.Received;
+            app.Sent = t.Sent - process.Baseline.Sent;
+            app.Received = t.Received - process.Baseline.Received;
             app.Connections = byPid.GetValueOrDefault(pid);
             _previous[pid] = t;
         }
-        return _apps.Values.ToList();
+        return _apps.Values.Select(process => process.Traffic).ToList();
     }
 }

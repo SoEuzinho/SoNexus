@@ -31,12 +31,12 @@ public partial class GameLibraryView : UserControl
         {
             game.Requirements = await GamesService.RequirementsAsync(game);
             GamesService.Estimate(game, _pc);
-            if (game.Requirements?.Image is { } img) game.Image = img;
+            if (AppSettings.Current.AllowOnline && game.Requirements?.Image is { } img) game.Image = img;
             done++;
             if (done % 5 == 0) Status.Text = $"{_games.Count} jogos · analisando {done}/{_games.Count}...";
         }
-        var heavy = _games.Count(g => g.Order <= 1);
-        Status.Text = $"{_games.Count} jogos instalados · {_games.Count(g => g.Order >= 3)} rodam bem ou liso · {heavy} pesado(s) para o seu PC · {_pc.Gpu}, monitor {_pc.Resolution}";
+        var estimated = _games.Count(g => g.Order < 8);
+        Status.Text = $"{_games.Count} jogos encontrados · {estimated} com estimativa de desempenho · {_pc.Gpu}, monitor {_pc.Resolution}";
         if (SortBox.SelectedIndex == 1) ApplyFilter();
     }
 

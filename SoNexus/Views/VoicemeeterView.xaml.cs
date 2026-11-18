@@ -62,6 +62,9 @@ public partial class VoicemeeterView : UserControl
 
     private void Mute_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is Button { Tag: VmChannel c }) _vm?.ToggleMute(c);
+        if (sender is Button { Tag: VmChannel c } && _vm != null)
+            Status.Text = _vm.ToggleMute(c)
+                ? _vm.Status
+                : "O Voicemeeter recusou o ajuste de mudo. Confira a conexão ou clique em Reconectar.";
     }
 }

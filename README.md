@@ -25,12 +25,12 @@ Em vez de ter CPU-Z, HWMonitor, MSI Afterburner, Process Lasso, RAMMap, Ninite e
 |---|---|
 | **Hardware por peça** | Processador, placa de vídeo, RAM, discos, placa-mãe e fonte, cada um com informações, sensores (com mínimo e máximo), testes e dicas. |
 | **Saúde do PC** | Acha sozinho o que está segurando o computador: RAM em canal único, EXPO/XMP desligado, disco cheio, BIOS antiga, monitor abaixo do Hz. |
-| **Jogos** | Biblioteca de todos os launchers, FPS ao vivo, 1% low, engasgos e **gargalo medido de verdade durante a partida**. |
-| **Painel sobre o jogo** | Overlay com temas animados, configurável e leve (menos de 0,25% de CPU). |
+| **Jogos** | Biblioteca de launchers compatíveis, FPS de apresentação via ETW, 1% low, comparação de partidas e sinais de gargalo inferidos da telemetria. |
+| **Painel sobre o jogo** | Overlay com temas animados e perfis de configuração por executável. |
 | **Desempenho** | Teste completo (CPU, GPU, VRAM, RAM e disco, 3 rodadas), comparação antes/depois, stress test com corte por temperatura, overclock da placa e guia de EXPO, PBO e BIOS. |
 | **Ferramentas** | Liberar memória em espera, prioridade automática para jogos, limpeza de temporários, instalar vários programas de uma vez e teste de monitor (Hz e rastro). |
 | **Otimização** | Mais de 70 ajustes do Windows (telemetria, anúncios, IA, jogos), todos com backup e botão de desfazer. |
-| **Drivers, rede e áudio** | Driver de vídeo com um clique, remoção limpa (estilo DDU), rotas até servidores de jogos, DNS, Voicemeeter. |
+| **Drivers, rede e áudio** | Driver de vídeo com um clique, remoção seletiva de pacotes de vídeo, rotas até servidores de jogos, DNS, Voicemeeter. |
 | **Iluminação** | RGB pelo OpenRGB e fitas de LED Bluetooth (BJ_LED), com efeitos que seguem a temperatura, o uso ou a música. |
 
 ## Telas
@@ -39,7 +39,7 @@ Em vez de ter CPU-Z, HWMonitor, MSI Afterburner, Process Lasso, RAMMap, Ninite e
 <img src="docs/media/hardware.png" alt="Visão geral do hardware com a saúde do PC" width="860">
 
 ### Gargalo e FPS ao vivo
-<img src="docs/media/gargalo.png" alt="Gargalo medido nas partidas e estimado por resolução" width="860">
+<img src="docs/media/gargalo.png" alt="Tela de sinais de gargalo e estimativas por resolução" width="860">
 <img src="docs/media/fps-ao-vivo.png" alt="FPS ao vivo com a prévia do painel sobre o jogo" width="860">
 
 ### Temas do painel sobre o jogo
@@ -80,7 +80,7 @@ Para a temperatura do processador, o SoNexus oferece instalar o driver **PawnIO*
 
 - **Nada sai do seu PC**: sem conta, sem propaganda, sem rastreamento. Consultas na internet (requisitos de jogos, drivers) podem ser desligadas.
 - **Tudo tem desfazer**: cada ajuste do Windows guarda o valor original.
-- **Jogos e anti-cheat**: o FPS é medido pelos eventos públicos do Windows (ETW, o mesmo método do PresentMon) e o painel é uma janela separada. O SoNexus não lê nem altera a memória dos jogos. Mesmo assim, cada anti-cheat tem regras próprias: em jogos competitivos, se tiver dúvida, desligue o painel.
+- **Jogos e anti-cheat**: o FPS de apresentação usa eventos ETW do Windows. O painel é uma janela separada e não lê nem altera a memória dos jogos. As regras variam entre sistemas anti-cheat.
 - **Overclock com travas**: tensão bloqueada, limites de temperatura e regras de segurança antes de liberar os controles.
 
 ## Compilar

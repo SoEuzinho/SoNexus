@@ -50,7 +50,19 @@
         </ItemsControl>
 
         <TabControl>
-            <TabItem Header="Telas azuis e desligamentos">
+            <TabItem Header="Relatório de suporte">
+                <DockPanel Margin="0,0,14,0">
+                    <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+                        <TextBlock Style="{StaticResource Muted}" TextWrapping="Wrap"
+                                   Text="O relatório inclui versões e contagens de falhas. Nomes de usuário, caminhos, IPs, números de série e mensagens brutas dos eventos são excluídos. Revise antes de compartilhar."/>
+                        <Button x:Name="SaveReportButton" Content="Salvar relatório…" HorizontalAlignment="Left" Margin="0,8,0,0"
+                                IsEnabled="False" Click="SaveReport_Click"/>
+                        <TextBlock x:Name="SaveReportStatus" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                    </StackPanel>
+                    <TextBox x:Name="ReportPreview" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
+                </DockPanel>
+            </TabItem>
+            <TabItem Header="Telas azuis e desligamentos" IsSelected="True">
                 <Border Style="{StaticResource Card}" Padding="0" Margin="0,0,14,0">
                     <DataGrid x:Name="CrashGrid" RowHeight="NaN" MinRowHeight="34">
                         <DataGrid.Columns>
