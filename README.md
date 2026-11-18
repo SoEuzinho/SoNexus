@@ -1,102 +1,124 @@
 <div align="center">
 
+<img src="docs/media/sonexus-logo.png" alt="Ícone do SoNexus" width="96" height="96">
+
 # SoNexus
 
-**O seu PC inteiro num app só.**
-Hardware, jogos, desempenho, otimização e iluminação para Windows — grátis e de código aberto.
+**Monitoramento, jogos e ferramentas para Windows**
 
-por **SoStudio** · criado por **SoEuzinho**
+Veja como seu PC está funcionando, compare o desempenho das suas partidas e gerencie drivers, ajustes do Windows e iluminação em um app gratuito, de código aberto e em português.
 
-[**⬇ Baixar a última versão**](https://github.com/SoEuzinho/SoNexus/releases/latest) ·
-[🎬 Vídeo de divulgação](docs/media/divulgacao.mp4) ·
-[▶ Demonstração completa](docs/media/demo.mp4)
+[![Baixar SoNexus](https://img.shields.io/badge/Baixar-SoNexus-2563EB?style=for-the-badge)](https://github.com/SoEuzinho/SoNexus/releases/latest)
+![Compatibilidade](https://img.shields.io/badge/Windows-10%20%7C%2011-334155?style=for-the-badge)
+[![Licença MIT](https://img.shields.io/badge/Licen%C3%A7a-MIT-047857?style=for-the-badge)](LICENSE)
 
-<img src="docs/media/demo.gif" alt="Demonstração do SoNexus passando pelas telas" width="860">
+![C#](https://img.shields.io/badge/C%23-512BD4?style=flat-square)
+![.NET 8](https://img.shields.io/badge/.NET-8-512BD4?style=flat-square)
+![WPF](https://img.shields.io/badge/Interface-WPF-334155?style=flat-square)
+![ETW](https://img.shields.io/badge/Telemetria-ETW-334155?style=flat-square)
+
+[Funcionalidades](#funcionalidades) · [Instalação](#instalação) · [Demonstração](#demonstração) · [Privacidade](#privacidade) · [Compilar](#compilar)
+
+Criado por **SoEuzinho** · **SoStudio**
 
 </div>
 
 ---
 
-## O que ele faz
+## Funcionalidades
 
-Em vez de ter CPU-Z, HWMonitor, MSI Afterburner, Process Lasso, RAMMap, Ninite e um monte de scripts, o SoNexus junta tudo numa interface só, em português, com explicação simples do que cada número significa e do que fazer.
-
-| | |
+| Área | O que você pode fazer |
 |---|---|
-| **Hardware por peça** | Processador, placa de vídeo, RAM, discos, placa-mãe e fonte, cada um com informações, sensores (com mínimo e máximo), testes e dicas. |
-| **Saúde do PC** | Acha sozinho o que está segurando o computador: RAM em canal único, EXPO/XMP desligado, disco cheio, BIOS antiga, monitor abaixo do Hz. |
-| **Jogos** | Biblioteca de launchers compatíveis, FPS de apresentação via ETW, 1% low, comparação de partidas e sinais de gargalo inferidos da telemetria. |
-| **Painel sobre o jogo** | Overlay com temas animados e perfis de configuração por executável. |
-| **Desempenho** | Teste completo (CPU, GPU, VRAM, RAM e disco, 3 rodadas), comparação antes/depois, stress test com corte por temperatura, overclock da placa e guia de EXPO, PBO e BIOS. |
-| **Ferramentas** | Liberar memória em espera, prioridade automática para jogos, limpeza de temporários, instalar vários programas de uma vez e teste de monitor (Hz e rastro). |
-| **Otimização** | Mais de 70 ajustes do Windows (telemetria, anúncios, IA, jogos), todos com backup e botão de desfazer. |
-| **Drivers, rede e áudio** | Driver de vídeo com um clique, remoção seletiva de pacotes de vídeo, rotas até servidores de jogos, DNS, Voicemeeter. |
-| **Iluminação** | RGB pelo OpenRGB e fitas de LED Bluetooth (BJ_LED), com efeitos que seguem a temperatura, o uso ou a música. |
+| **Hardware** | Acompanhar temperaturas, uso, clocks, consumo e ventoinhas. Consultar a saúde dos discos e o histórico SMART quando o hardware disponibiliza esses dados. |
+| **Jogos** | Encontrar instalações de launchers compatíveis, acompanhar FPS e 1% low e comparar duas partidas. Salvar posição, tamanho e métricas do overlay por executável. |
+| **Desempenho** | Executar benchmarks de CPU, GPU, memória e disco, comparar resultados e usar testes de carga com proteção térmica. Consultar guias de BIOS, EXPO e PBO. |
+| **Drivers** | Consultar versões instaladas, buscar drivers de vídeo e remover pacotes selecionados. Exportar um backup antes da remoção e escolher um INF salvo para reinstalar. |
+| **Diagnóstico** | Consultar falhas e telas azuis registradas pelo Windows, investigar latência DPC e gerar um relatório de suporte local com prévia. |
+| **Otimização** | Gerenciar inicialização, modificar ajustes do Windows com opções de reversão, limpar temporários, testar o monitor e instalar programas via WinGet. |
+| **Rede e áudio** | Acompanhar tráfego por aplicativo, testar rotas e DNS, ajustar volumes e integrar o Voicemeeter. |
+| **Iluminação** | Controlar dispositivos compatíveis pelo OpenRGB ou fitas Bluetooth BJ_LED, com efeitos que reagem à música, à temperatura ou ao uso do PC. |
 
-## Telas
+**Como interpretar os dados de jogos.** O FPS ao vivo é calculado a partir das apresentações registradas pelo Windows via ETW. Os sinais de gargalo são inferidos a partir da telemetria do sistema durante a partida. As previsões da biblioteca e da tela por resolução usam requisitos e tabelas de referência.
 
-### Saúde do PC e hardware por peça
-<img src="docs/media/hardware.png" alt="Visão geral do hardware com a saúde do PC" width="860">
+## Instalação
 
-### Gargalo e FPS ao vivo
-<img src="docs/media/gargalo.png" alt="Tela de sinais de gargalo e estimativas por resolução" width="860">
-<img src="docs/media/fps-ao-vivo.png" alt="FPS ao vivo com a prévia do painel sobre o jogo" width="860">
+1. Abra a [última versão publicada](https://github.com/SoEuzinho/SoNexus/releases/latest) e baixe o arquivo `SoNexus-Setup-<versão>.exe`.
+2. Se quiser conferir o download, compare o SHA-256 com o arquivo publicado junto ao instalador.
 
-### Temas do painel sobre o jogo
-<img src="docs/media/temas.gif" alt="Temas animados do painel: Neon, Imperial, Pixel, Arena, Fofo e Cristal" width="860">
-
-<sub>Temas originais do SoNexus (valores ilustrativos na animação). Nenhum usa marca, logo ou personagem de jogo ou empresa.</sub>
-
-### Desempenho: EXPO, PBO e BIOS
-<img src="docs/media/expo-pbo-bios.png" alt="Guia de EXPO, PBO e BIOS com dados do PC" width="860">
-
-### Ferramentas
-<img src="docs/media/instalar-programas.png" alt="Instalar vários programas de uma vez" width="860">
-<img src="docs/media/limpeza.png" alt="Limpeza de temporários e cache de shaders" width="860">
-
-### Iluminação RGB e otimização do Windows
-<img src="docs/media/rgb.png" alt="Iluminação RGB pelo OpenRGB e fitas Bluetooth" width="860">
-<img src="docs/media/otimizacao.png" alt="Debloat do Windows com ajustes reversíveis" width="860">
-
-## Vídeos
-
-- 🎬 **[Vídeo de divulgação (1min15)](docs/media/divulgacao.mp4)**: narrado, com animações e capítulos, para compartilhar.
-- ▶ **[Demonstração completa (47 s)](docs/media/demo.mp4)**: passando pelas telas do app.
-
-## Instalar
-
-1. Baixe o `SoNexus-Setup-<versão>.exe` na página **[Releases](https://github.com/SoEuzinho/SoNexus/releases/latest)**.
-2. (Opcional) confira o arquivo com o SHA-256 publicado ao lado:
    ```powershell
-   Get-FileHash .\SoNexus-Setup-0.25.0.exe -Algorithm SHA256
+   Get-FileHash ".\SoNexus-Setup-<versão>.exe" -Algorithm SHA256
    ```
-3. Instale e abra. Na primeira vez, o SoNexus mostra os Termos de Uso e Privacidade.
 
-Requisitos: Windows 10 (1809+) ou 11, 64 bits. Não precisa instalar o .NET. O app pede administrador (sensores, ventoinhas e ajustes do sistema).
+3. Execute o instalador e abra o SoNexus. Na primeira abertura, leia os Termos de Uso e Privacidade.
 
-Para a temperatura do processador, o SoNexus oferece instalar o driver **PawnIO** (assinado), que substitui o antigo WinRing0 bloqueado pelo Windows Defender.
+O SoNexus requer **Windows 10 (1809 ou posterior) ou Windows 11, x64**. O instalador inclui o runtime do .NET. O aplicativo solicita autorização de administrador pelo Windows para acessar sensores e recursos do sistema. Alguns sensores de CPU e placa-mãe podem exigir o driver assinado **PawnIO**, oferecido pelo próprio app.
 
-## Segurança e privacidade
+### Por onde começar
 
-- **Nada sai do seu PC**: sem conta, sem propaganda, sem rastreamento. Consultas na internet (requisitos de jogos, drivers) podem ser desligadas.
-- **Tudo tem desfazer**: cada ajuste do Windows guarda o valor original.
-- **Jogos e anti-cheat**: o FPS de apresentação usa eventos ETW do Windows. O painel é uma janela separada e não lê nem altera a memória dos jogos. As regras variam entre sistemas anti-cheat.
-- **Overclock com travas**: tensão bloqueada, limites de temperatura e regras de segurança antes de liberar os controles.
+| Quero… | Onde abrir |
+|---|---|
+| **Ver a saúde do PC** | Abra **Hardware** e escolha uma peça. Em **Armazenamento**, consulte as leituras SMART disponíveis. |
+| **Medir um jogo** | Abra **Jogos › FPS ao vivo**, inicie a medição e jogue por pelo menos 30 segundos. Consulte as sessões em **Seu PC e gargalo**. |
+| **Preparar uma instalação limpa do driver** | Abra **Drivers › Remover driver de vídeo**, confira os pacotes marcados e escolha onde guardar o backup. |
+| **Investigar travamentos** | Abra **Diagnóstico › Erros e telas azuis**. Na aba **Relatório de suporte**, revise a prévia antes de salvar. |
+
+## Demonstração
+
+<img src="docs/media/demo.gif" alt="Demonstração das principais telas do SoNexus" width="860">
+
+[Vídeo de divulgação (1min15)](docs/media/divulgacao.mp4) · [Demonstração completa (47 s)](docs/media/demo.mp4)
+
+<details>
+<summary>Ver capturas de tela e temas do overlay</summary>
+
+| Hardware | FPS ao vivo |
+|---|---|
+| ![Saúde do PC e hardware](docs/media/hardware.png) | ![FPS ao vivo e prévia do overlay](docs/media/fps-ao-vivo.png) |
+
+| Gargalo e estimativas | EXPO, PBO e BIOS |
+|---|---|
+| ![Sinais de gargalo e estimativas](docs/media/gargalo.png) | ![Guia de EXPO, PBO e BIOS](docs/media/expo-pbo-bios.png) |
+
+| Instalação de programas | Limpeza |
+|---|---|
+| ![Instalação de programas](docs/media/instalar-programas.png) | ![Limpeza de temporários](docs/media/limpeza.png) |
+
+| Iluminação RGB | Otimização do Windows |
+|---|---|
+| ![Controle de iluminação RGB](docs/media/rgb.png) | ![Ajustes reversíveis do Windows](docs/media/otimizacao.png) |
+
+![Temas animados do overlay](docs/media/temas.gif)
+
+Os números na animação dos temas são ilustrativos.
+
+</details>
+
+## Privacidade
+
+O SoNexus funciona sem cadastro ou rastreamento. Configurações, logs e backups ficam no PC. Funções online podem consultar serviços de terceiros, como a loja Steam para requisitos de jogos. Você pode desligar as consultas automáticas em **Configurações › Privacidade**. [Termos de Uso e Privacidade](SoNexus/TERMOS-E-PRIVACIDADE.txt)
+
+O overlay é uma janela separada que usa eventos do Windows para acompanhar a apresentação de quadros. Cada jogo pode ter regras próprias para overlays e anti-cheat.
 
 ## Compilar
 
+O app usa **C# com WPF no .NET 8**. Entre as dependências estão LibreHardwareMonitor para sensores, TraceEvent para ETW, NAudio para áudio e Vortice para Direct3D 11.
+
+Para compilar a partir da raiz do repositório:
+
 ```powershell
 winget install Microsoft.DotNet.SDK.8
+dotnet build .\SoNexus\SoNexus.csproj -c Release
+```
+
+Para gerar a distribuição portátil, o instalador e o arquivo SHA-256:
+
+```powershell
 winget install JRSoftware.InnoSetup
 .\build.ps1
 ```
 
-Gera `publish\<versão>\` (versão portátil) e `installer\Output\SoNexus-Setup-<versão>.exe` + `.sha256`.
-
-Feito em C# / WPF (.NET 8) com LibreHardwareMonitor, TraceEvent (ETW), NAudio, Vortice (Direct3D 11) e OpenRGB SDK.
+A versão portátil fica em `publish\<versão>\`. O instalador e o SHA-256 ficam em `installer\Output\`.
 
 ## Licença e créditos
 
-Código sob a licença [MIT](LICENSE) — © 2026 SoEuzinho (SoStudio).
-Bibliotecas e projetos de terceiros: veja [THIRD-PARTY-NOTICES.txt](SoNexus/THIRD-PARTY-NOTICES.txt).
-Marcas citadas (NVIDIA, AMD, Intel, Microsoft, Steam etc.) pertencem aos seus donos; o SoNexus não é afiliado a elas.
+SoNexus é um projeto de **SoEuzinho (SoStudio)** distribuído sob a [licença MIT](LICENSE). As licenças das dependências estão em [THIRD-PARTY-NOTICES.txt](SoNexus/THIRD-PARTY-NOTICES.txt).
